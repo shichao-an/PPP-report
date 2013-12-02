@@ -1,0 +1,161 @@
+% TEMPLATE for Usenix papers, specifically to meet requirements of
+%  USENIX '05
+% originally a template for producing IEEE-format articles using LaTeX.
+%   written by Matthew Ward, CS Department, Worcester Polytechnic Institute.
+% adapted by David Beazley for his excellent SWIG paper in Proceedings,
+%   Tcl 96
+% turned into a smartass generic template by De Clarke, with thanks to
+%   both the above pioneers
+% use at your own risk.  Complaints to /dev/null.
+% make it two column with no page numbering, default is 10 point
+
+% Munged by Fred Douglis <douglis@research.att.com> 10/97 to separate
+% the .sty file from the LaTeX source template, so that people can
+% more easily include the .sty file into an existing document.  Also
+% changed to more closely follow the style guidelines as represented
+% by the Word sample file. 
+
+% Note that since 2010, USENIX does not require endnotes. If you want
+% foot of page notes, don't include the endnotes package in the 
+% usepackage command, below.
+
+\documentclass[letterpaper,twocolumn,10pt]{article}
+\usepackage{usenix, epsfig,endnotes}
+\usepackage{hyphenat}
+\usepackage{hyperref}
+
+% Paragraph margin
+\setlength{\parskip}{0.2em}
+
+\let\OLDthebibliography\thebibliography
+\renewcommand\thebibliography[1]{
+  \OLDthebibliography{#1}
+  \fontsize{8pt}{10pt}\selectfont
+  \setlength{\parskip}{0.2em}
+  \setlength{\itemsep}{0pt plus 0.3ex}
+}
+
+
+\begin{document}
+\fontsize{9pt}{11pt}\selectfont
+\hyphenation{}
+%don't want date printed
+\date{}
+
+%make title bold and 14 pt font (Latex default is non-bold, 16 pt)
+\title{\LARGE \bf Python and Parallel Programming}
+
+\author{
+\rm{Shichao An}\\
+\rm \small New York University\\
+\rm \small {shichao.an@nyu.edu}
+}
+
+\maketitle
+
+% Use the following at camera-ready time to suppress page numbers.
+% Comment it out when you first submit the paper for review.
+%\thispagestyle{empty}
+
+
+\subsection*{Abstract}
+This paper studies how to utilize parallelism in Python applications by comparing three different parallel programming methods. CPython's multithreading interface \verb#threading# and process-based ``threading'' interface \verb#multiprocessing# are discussed in terms of employing built-in functionalities, and OpenMP through \verb#cython.parallel# in Cython are introduced in terms of thread-based native parallelism.
+
+CPU-bound and I/O-bound programs are parallelized using these methods to demonstrate features and to compare performances. As an essential supplement, parallelized matrix programs are evaluated with \verb#multiprocessing# and OpenMP approaches to study the memory aspect.
+
+\section{Introduction}
+The difficulty involved with writing and debugging parallel code has become one obvious obstacle to developing parallel programs. With the development effort being the bottleneck and the prevalence of multiprocessor and multicore systems, it is a rational approach to give priority to efficient development and testing techniques and reusable parallel libraries rather than machine efficiency \cite{hinsen}. This led to the increasing use of high-level languages such as Python, which supports multiprocessing and multithreading, and guarantees highly efficient development.
+
+The standard library of Python's reference implementation, CPython (2.x), provides the following built-in modules: the lower-level \verb#thread#, the higher level \verb#threading# and \verb#multiprocessing# module. The \verb#threading# module provides an easy-to-use threading API built on top of the \verb#thread# module, and the \verb#multiprocessing# module applies a similar interface to spawning and managing subprocesses.
+
+Most programmers will intuitively starts with the default multithreading module, \verb#threading#. It makes use of real system threads and provides friendly thread management interface and synchronization mechanisms such as Lock, RLock, Condition and Semaphore. However, the Global Interpreter Lock ensures that only one thread can execute Python code at once. This makes it easier for the interpreter to be multi-threaded, but is at the expense of much of the parallelism afforded by multicore and multiprocessor machines \cite{glossary}.
+
+When realizing the restrictions of GIL and requiring to make better use of the computational resources, programmers may choose \verb#multiprocessing# to side-step GIL. It gives a similar interface to \verb#threading# but uses subprocesses to enable the programmers to fully leverage multiple processors. However, it also brings overhead in process switching and inter-process communication. 
+
+Given the nature of GIL and the expense of multiprocessing, native parallelism should be considered while still keeping an eye on development efficiency. Cython with OpenMP is such a solution that seems less intuitive but appeals to those familiar with OpenMP. It makes it easier to integrate with existing Python code and releases GIL for better parallel performance.
+
+This paper provides a comprehensive study of the three approaches by comparing them under different circumstances and analyzing features in regard to the comparison of the performances. It aims at providing an evaluation report to help programmers better decide the programming method to efficiently parallelize their various applications.
+
+\section{Literature Survey}
+Use of Python on shared-memory multiprocessor or multicore systems is prevalent. Much of the work employs Python in scientific computing field, e.g. parallel numerical computations. Other work discusses specific aspects in a more general field.
+
+Masini et al. \cite{masini} present the porting process of a multicore eigensolver to Python and discuss the pros and cons of using Python in a high-performance parallel library. They focus on Python's advantages in improving code readability, flexibility and correctness compared to C and Fortran within parallel numerical computations. The work also introduces performance issues by explaining impact of the Global Interpreter Lock. However, their work does not discuss in detail the multithreading in terms of parallelism, and fails to give an alternative or solution to the performance overhead and contention.
+
+The parallelization experiments using \verb#multiprocessing# and \verb#threading# by Eli Bendersky \cite{bendersky} reveals more relevance to my work. The demonstration of parallelizing CPU-bound tasks has greatly influenced my thinking. It gives a complete benchmark of the serial, multithreading, and multiprocessing programs to demonstrate Python thread's weakness in speeding up CPU-bound computations and the simplicity of parallelizing code using \verb#multiprocessing#. Another experiment in \verb#threading# also mentions the applicable scope of Python thread. However, these experiments have not presented an comparison of multithreading and multiprocessing in parallelizing I/O bound and memory-bound programs to make a thorough conclusion.
+
+David Beazley's \cite{dabeaz1}\cite{dabeaz2} articles and presentations provide elaborate illustrations of Global Interpreter Lock (GIL) with exploration from Python script to C source code. His work delves into the behind-the-scenes details of GIL by analyzing behavior and implementations from both the interpreter and operating system perspectives. While many aspects in his work are far beyond the scope of this paper, his focus is on GIL's impact on Python thread in doing CPU-bound and I/O-bound tasks. The study is essentially about the threading behavior and potential improvement of the GIL itself, not the more general approach of parallel programming in Python. 
+
+In other related work \cite{rudd}\cite{molden}, the implementations simply adopt either of threading or multiprocessing without comparing the two and generalizing pros and cons. They don't discuss under what circumstances one method is applicable. My work provides an overview that encapsulates different parallel programming approaches by discussing the advantage and drawback of each and reckoning their applicable scopes as result of parallelizing CPU-bound, I/O-bound and memory-bound programs.
+
+\section{Proposed Idea}
+
+Despite the fact that \verb#threading#, \verb#multiprocessing# and Cython/OpenMP address parallel problems at different levels of granularity, they are still often used as alternatives to each other, especially when the drawbacks of one becomes the bottleneck under a specific circumstance. This is largely due to their implementation discrepancies, which may in return bring improvement of either performance or development efficiency. In order to demonstrate various aspects of the three approaches, several sample programs are chosen and parallelized using these approaches. The concentration is on the parallelization of the CPU-bound and I/O-bound programs, and parallelization of the memory-bound using \verb#multiprocessing# and Cython/OpenMP focuses on comparing the efficiency of different types of supported data structures.
+
+Parallelizing Python programs does not have much difference from parallelizing programs in other languages. It is a common approach to identify parallelism, enforce dependencies and handle synchronization. The essential part is to think of the problem in terms of a Python programmer who wants things done in the most ``intuitive way''. This means it is better to use the simplest supported interfaces (packages, modules, functions and data structures) that is clearly understandable with least coding and debugging effort while ensuring correctness. 
+
+When implementing a parallel version using one approach, comparable counterparts of other approaches should be taken into account. For example, when implementing a global list with the \verb#threading# approach, the correspondingly applicable data structures  in \verb#multiprocessing# approach such as Array in shared memory or ListProxy should be considered instead of using other data structures such as Queue with a different implementing logic. Keeping the similarity of logic in this way gives programmers a better observation on the performance.
+
+However, the above rule has a disadvantage that may cause loss in performance when implementing other approaches. In Cython, for instance, the global interpreter lock (GIL) cannot be released if manipulating Python built-ins or objects in parallel sections, which makes it impossible to achieve native parallelism. Therefore, a better solution is to find a balance that deals with both aspects and put the analysis of annoying factors into an independent experiment. As a promising result, further parallelization can be performed to demonstrate the side-effects compared to the serial version, such as GIL restrictions, overhead in managing threads or processes, and contentions in using locks.
+
+With the abovementioned parallelization work done, comparison of the parallelized programs makes more sense, particularly in two major criteria: development efficiency and performance. The complexity of the parallelized program, which may be reflected by total number of lines of code, determines the primary development effort. The compatibility is also one aspect that programmers pay much attention to in order to interface with existing applications. This generally involves the conversion of data structures under these approaches. Unlike scripting, Cython/OpenMP requires extra setup script and compile procedure that is platform-dependent, which also affects development efficiency.
+
+Besides development, the performance is important in most cases and is obtained by benchmarking. It provides basis on which the overhead, produced by various factors such as thread/process creation and scheduling, the GIL and data structures, can be analyzed. By comparing the performances of the implementation of these approaches, the overall applicability of each approach can be determined, which comprises the ultimate goal of this paper. 
+
+\section{Experimental Setup}
+The experiments will use Python 2.7 for \verb#threading# and \verb#multiprocessing# approaches and use Cython 0.19 for OpenMP approach. The machine has 2 physical cores and 4 logical cores. The operating systems will be OS X 10.8.
+
+The \verb#time.time# function of Python's \verb#time# module will be used for benchmarking programs. The programs are non-trivial, so it is better to measure the wall-clock time to reflect the production environment.
+
+\section{Experiments and Discussion}
+The development efficiency and performances are major measures to make an evaluation overview of the parallelizing methods. The expected results are case dependent, but can be generalized in terms of these measures as follows: 
+\begin{itemize}
+\setlength{\itemsep}{0em}
+  \item Development efficiency: \verb#threading# always have less coding effort and better compatibility than the other two, while Cython/OpenMP requires the most effort.
+  \item Performance: \verb#multiprocessing# and Cython/OpenMP generally performs better than \verb#threading# in CPU intensive tasks, but \verb#threading# performs better in I/O-bound programs.
+\end{itemize}
+
+To obtain resulting measures, the following parallelization and benchmarking experiments are conducted:
+\begin{itemize}
+\setlength{\itemsep}{0em}
+  \item CPU-bound experiment. The serial program is a time-consuming complex task that processes a list of freshly generated origin, destination and distances to remove duplicates and fix reverse distances to keep data consistency.
+  \item I/O-bound experiment. The serial program is a parser that checks whether each word in a sentence is an accessible entry against the Wikipedia API.
+  \item Memory-bound experiment. This is a matrix multiplication program that manipulates large matrices. It is applicable to the utilization of true parallelism of \verb#mutliprocessing# and Cython/OpenMP approaches using NumPy arrays.
+  \item Overhead analysis experiment. This one is derived from the CPU-bound experiment but does a different task. Parallelized versions are not expected to perform better than the serial one. The comparison is done between parallel versions to analyze the overhead of utilizing different data structures, such as \verb#multiprocessing.Manager#, \verb#multiprocessing.Value#, Cython arrays, NumPy arrays, C arrays (using typed memoryviews in Cython)
+\end{itemize}
+
+\section{Future Work}
+
+\begin{itemize}
+\setlength{\itemsep}{0em}
+  \item Parallelize the CPU-bound and I/O-bound programs each with all methods. Parallelize the memory-bound program with the latter two methods. 
+  \item Setup the experimental environments and benchmark the serial and parallelized programs
+  \item Analyze the benchmark results and draw conclusions
+\end{itemize}
+
+\begin{thebibliography}{10}
+
+  \bibitem{hinsen} Konrad Hinsen. Parallel Scripting with Python. {\em 
+  Computing in Science \& Engineering}, 9(6):82-89, November 2007.
+
+  \bibitem{glossary}  Glossary. \url{http://docs.python.org/2/glossary.html#term-global-interpreter-lock}
+  
+  \bibitem{masini} Stefano Masini, Paolo Bientinesi. High-Performance Parallel Computations Using Python as High-Level Language. {\em Lecture Notes in Computer Science Volume}, 6586:541-548, 2011
+  
+  \bibitem{bendersky} Eli Bendersky. Parallelizing CPU-bound tasks with multiprocessing. \url{http://eli.thegreenplace.net/2012/01/16/python-parallelizing-cpu-bound-tasks-with-multiprocessing/}
+
+  \bibitem{dabeaz1} David Beazley. Understanding the Python GIL. \url{http://www.dabeaz.com/python/UnderstandingGIL.pdf}
+
+  \bibitem{dabeaz2} David Beazley. Inside the Python GIL. \url{http://www.dabeaz.com/python/GIL.pdf}
+
+  \bibitem{rudd} J. Rudd et al. A multi-core parallelization strategy for statistical significance testing in learning classifier systems. {\em Evolutionary Intelligence}, October 2013
+
+  \bibitem{molden} S. Molden. Using Python, multiprocessing and NumPy/SciPy for parallel numerical computing. \url{http://folk.uio.no/sturlamo/python/multiprocessing-tutorial.pdf}
+ 
+\end{thebibliography}
+
+\end{document}
+
+
+
+
+
