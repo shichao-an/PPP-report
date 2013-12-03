@@ -7,5 +7,5 @@ This is final report for this project.
 Usage
 -----
 Compile the LaTeX source file and generate PDF::
-
-  $ pdflatex src/ppp.tex
+  $ cd src/
+  $ pdflatex ppp.tex
