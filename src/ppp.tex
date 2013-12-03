@@ -25,9 +25,13 @@
 \usepackage{hyperref}
 \usepackage{titlesec}
 
-% Change subsection font size
+% Change caption settings
+\usepackage[font=footnotesize,labelfont=bf]{caption}
+
+% Change font and spacing
 \titleformat*{\subsection}{\normalsize\bfseries}
 \titlespacing{\subsection}{0pt}{0.8em}{0.8em}
+
 
 % Paragraph margin
 \setlength{\parskip}{0.2em}
@@ -128,21 +132,42 @@ In the experiments, the following tools will be used to profile and benchmark pr
 
 The \verb#time# function of Python's \verb#time# module will be used for timing programs (real time). The programs are non-trivial, so it is better to measure the wall-clock time to reflect the production environment. This is primary benchmark that comprises most of the evaluation result.
 
-To further measure user and system times of the processes for analysis purpose, \verb#psutil# will be used as a general process status utility used in a programmatic manner \cite{psutil}. It is used to determine the types of programs by checking CPU usage and network connections.
+To further measure user and system times of the processes for analysis purpose, \verb#psutil# will be used as a general process status utility used in a programmatic manner \cite{psutil}. It is used to determine the types of programs by checking CPU usage and network connections. \verb#cProfile#, the standard profiler for Python, will be used to provide deterministic profiling for the programs to find bottlenecks.
 
-\verb#cProfile#, the standard profiler for Python, will be used to provide deterministic profiling for the programs to find bottlenecks.
+As one of the major comparison criteria in the parallelization experiments, development efficiency needs manual evaluation from a different analysis perspective from that of performance. This means some subjectiveness may be related to conclude this criteria, such as programming effort to ensure interface compatibility and debugging difficulty (such as Cython's compile time check). However, code checking tools such as \textit{flake8} \cite{flake8} and \textit{cloc} \cite{cloc} will still be used to help measure development efficiency by providing substantial statistics like McCabe complexity (cyclomatic complexity) and lines of code.
 
-As one of the major comparison criteria in the parallelization experiments, development efficiency needs manual evaluation from a different analysis perspective from that of performance. This means some subjectiveness may be related to conclude this criteria, such as programming effort to ensure interface compatibility and debugging difficulty (such as Cython's compile time check).
 
 \section{Experiments and Discussion}
-The development efficiency and performances are major measures to make an evaluation overview of the parallelizing methods. The expected results are case dependent, but can be generalized in terms of these measures as follows: 
-\begin{itemize}
-\setlength{\itemsep}{0em}
-  \item Development efficiency: \verb#threading# always have less coding effort and better compatibility than the other two, while Cython/OpenMP requires the most effort.
-  \item Performance: \verb#multiprocessing# and Cython/OpenMP generally performs better than \verb#threading# in CPU intensive tasks, but \verb#threading# performs better in I/O-bound programs.
-\end{itemize}
+The development efficiency and performances are major measures to make an evaluation overview of the parallelizing methods. 
 
-To obtain resulting measures, the following parallelization and benchmarking experiments are conducted:
+Development efficiency is evaluated by comparing the parallelized source code with the sequential and measure the specific criteria: 1. The number of additional necessary interface used to perform parallelization and ensure correctness (thread-safe) 2. Extra effort to take to ensure interface compatibility with the original program; 3. Extra configuration and debugging steps; 4. Incremented complexity of the program.
+
+Performance is evaluated: 1. Real time to run the parallelized program to see how much speedup or overhead is brought; 2. User/system time (larger than real time) and of the multi-threaded and multi-processing program to see how much parallelism is brought (particularly for OpenMP);
+
+
+The expected results are case dependent, but can be generalized in terms of these measures
+
+Development efficiency: \verb#threading# always have less coding effort and better compatibility than the other two, while Cython/OpenMP requires the most effort.
+
+Performance: In terms of real time, \verb#multiprocessing# and Cython/OpenMP generally performs better than \verb#threading# in CPU intensive tasks, but \verb#threading# and Cython/OpenMP performs better in I/O-bound programs. In terms of parallelism, only Cython/OpenMP and \verb#multiprocessing# will bring native parallelism, while \verb#threading# cannot due to the restriction of GIL
+
+
+measures as follows: 
+\begin{figure}[h!]
+
+  \centering
+    \includegraphics[width=24em]{../img/cpu_bound.png}
+      \caption{A picture of a gull.}
+\end{figure}
+
+
+\subsection{Parallelization}
+\subsection{Results and Analysis}
+timing: real time
+user / system time
+profiling
+\section{Conclusion}
+
 
 \section{Future Work}
 
@@ -174,12 +199,12 @@ To obtain resulting measures, the following parallelization and benchmarking exp
   
   \bibitem{core} ARK | Intel Coreª i7-3520M Processor (4M Cache, up to 3.60 GHz). \url{http://ark.intel.com/products/64893}
 
-  \bibitem{psutil}  psutil - A cross-platform process and system utilities module for Python. \url{https://code.google.com/p/psutil/}
+  \bibitem{psutil} psutil - A cross-platform process and system utilities module for Python. \url{https://code.google.com/p/psutil/}
+
+  \bibitem{flake8} Flake8 - flake8 2.0 documentation. \url{https://flake8.readthedocs.org/en/2.0/}
+
+  \bibitem{cloc} CLOC -- Count Lines of Code. \url{http://cloc.sourceforge.net/}
+
 \end{thebibliography}
 
 \end{document}
-
-
-
-
-
