@@ -23,6 +23,10 @@
 \usepackage{usenix, epsfig,endnotes}
 \usepackage{hyphenat}
 \usepackage{hyperref}
+\usepackage{titlesec}
+
+% Change subsection font size
+\titleformat*{\subsection}{\normalsize\bfseries}
 
 % Paragraph margin
 \setlength{\parskip}{0.2em}
@@ -61,7 +65,7 @@
 \subsection*{Abstract}
 This paper studies how to utilize parallelism in Python applications by comparing three different parallel programming methods. CPython's multithreading interface \verb#threading# and process-based ``threading'' interface \verb#multiprocessing# are discussed in terms of employing built-in functionalities, and OpenMP through \verb#cython.parallel# in Cython are introduced in terms of thread-based native parallelism.
 
-CPU-bound and I/O-bound programs are parallelized using these methods to demonstrate features and to compare performances. As an essential supplement, parallelized matrix programs are evaluated with \verb#multiprocessing# and OpenMP approaches to study the memory aspect.
+CPU-bound and I/O-bound programs are parallelized using these methods to demonstrate features and to compare performances. As essential supplements, a derivative CPU-bound application and a matrix multiplication program are parallelized to study the overhead and memory aspect.
 
 \section{Introduction}
 The difficulty involved with writing and debugging parallel code has become one obvious obstacle to developing parallel programs. With the development effort being the bottleneck and the prevalence of multiprocessor and multicore systems, it is a rational approach to give priority to efficient development and testing techniques and reusable parallel libraries rather than machine efficiency \cite{hinsen}. This led to the increasing use of high-level languages such as Python, which supports multiprocessing and multithreading, and guarantees highly efficient development.
@@ -102,9 +106,37 @@ With the abovementioned parallelization work done, comparison of the parallelize
 Besides development, the performance is important in most cases and is obtained by benchmarking. It provides basis on which the overhead, produced by various factors such as thread/process creation and scheduling, the GIL and data structures, can be analyzed. By comparing the performances of the implementation of these approaches, the overall applicability of each approach can be determined, which comprises the ultimate goal of this paper. 
 
 \section{Experimental Setup}
-The experiments will use Python 2.7 for \verb#threading# and \verb#multiprocessing# approaches and use Cython 0.19 for OpenMP approach. The machine has 2 physical cores and 4 logical cores. The operating systems will be OS X 10.8.
+In this section, the applications to be parallelized with the different approaches will be introduced. Then, the experimental environment and tools will be discussed. 
+
+The experiments will be conducted on a MacBook Pro with an Intel Core i7 (2.9 GHz, 4 MB on-chip L3 cache, 2 physical cores, 4 logical cores \cite{core}). The operating system is OS X 10.8.5 (Darwin 12.5.0, x86\_64). The applications and their parallelized versions are programmed in Python 2.7.3 and Cython 0.19.2 under virtualenv 1.9.1. The GCC version is 4.2.1 (Apple Inc. build 5666), which supports the OpenMP v2.5 specification.
+
+\#
+First, applications  to be parallelized are introduced. They are CPU-bound, I/O-bound, ... To ensure they are with the right label, the application itself has specific CPU usages or I/O requests. Also, use process status tools (psutil) to check.
+
+\subsection{Experimental Applications}
+There are four groups of applications in the study. Each group has an original sequential program labeled as \verb#serial# and its parallelized versions using \verb#threading#, \verb#multiprocessing#, and Cython/OpenMP approaches. The following list gives descriptions of each application group as for what tasks they are doing. The parallelization procedure will be discussed in the Experiments and Discussion section.
+\begin{itemize}
+\setlength{\itemsep}{0em}
+  \item \textbf{CPU-bound} (\verb#cpu_bound#). This application performs a time-consuming task that processes a freshly generated file of data. The file contains lines of origin, destination and in-between distance that are represented in random integers. The task is to remove the duplicate appearances of origin and destination and fix the distance of those lines where origin and destination are reversed to generate a consistent list. The program is expected to be CPU-bound which can be ensured using \verb#psutil# (discussed in the next subsection).
+  
+  \item \textbf{I/O-bound} (\verb#io_bound#). This application is a simple word parser that checks whether each possible combinations of words in the input sentence or paragraph comprises an accessible title of article on Wikipedia. It performs HTTP GET requests to the Wikipedia API to analyze the returned JSON responses and generates the output which lists all titles of the accessible entries.
+  
+  \item \textbf{Memory-bound} (\verb#memory_bound#). This is a matrix multiplication program that manipulates large matrices. Two random matrices are multiplied and the result product is generated. Although in practice this program is not necessarily memory-bound (otherwise must be CPU-bound), it is assumed to be memory-bound due to the nature of matrix-vector multiplication. With simplicity in the source code, this program is also applicable to the illustration of statically and dynamically typed comparison between Python and Cython.
+  
+  \item \textbf{Overhead} analysis (\verb#overhead#). This one is derived from the CPU-bound program but does a different task. It processes the output of the CPU-bound program to perform calculations on the list. It then outputs the maximum and minimum distances in that list and generates a list of origin/destination each with the smallest in-between distance. The parallelized versions are not expected to perform better than the sequential one. The comparison is done between parallel versions to analyze the overhead of utilizing different data structures, such as \verb#multiprocessing.Manager#, \verb#multiprocessing.Value#, Cython arrays, NumPy arrays, C arrays (using typed memoryviews in Cython).
+\end{itemize}
+
+
+\subsection{Profilers and Benchmarks}
 
 The \verb#time.time# function of Python's \verb#time# module will be used for benchmarking programs. The programs are non-trivial, so it is better to measure the wall-clock time to reflect the production environment.
+
+time.time
+cProfile
+psutil
+cloc
+flake8
+
 
 \section{Experiments and Discussion}
 The development efficiency and performances are major measures to make an evaluation overview of the parallelizing methods. The expected results are case dependent, but can be generalized in terms of these measures as follows: 
@@ -117,7 +149,7 @@ The development efficiency and performances are major measures to make an evalua
 To obtain resulting measures, the following parallelization and benchmarking experiments are conducted:
 \begin{itemize}
 \setlength{\itemsep}{0em}
-  \item CPU-bound experiment. The serial program is a time-consuming complex task that processes a list of freshly generated origin, destination and distances to remove duplicates and fix reverse distances to keep data consistency.
+  \item \textbf{CPU-bound}. The serial program is a time-consuming complex task that processes a list of freshly generated origin, destination and distances to remove duplicates and fix reverse distances to keep data consistency.
   \item I/O-bound experiment. The serial program is a parser that checks whether each word in a sentence is an accessible entry against the Wikipedia API.
   \item Memory-bound experiment. This is a matrix multiplication program that manipulates large matrices. It is applicable to the utilization of true parallelism of \verb#mutliprocessing# and Cython/OpenMP approaches using NumPy arrays.
   \item Overhead analysis experiment. This one is derived from the CPU-bound experiment but does a different task. Parallelized versions are not expected to perform better than the serial one. The comparison is done between parallel versions to analyze the overhead of utilizing different data structures, such as \verb#multiprocessing.Manager#, \verb#multiprocessing.Value#, Cython arrays, NumPy arrays, C arrays (using typed memoryviews in Cython)
@@ -150,7 +182,9 @@ To obtain resulting measures, the following parallelization and benchmarking exp
   \bibitem{rudd} J. Rudd et al. A multi-core parallelization strategy for statistical significance testing in learning classifier systems. {\em Evolutionary Intelligence}, October 2013
 
   \bibitem{molden} S. Molden. Using Python, multiprocessing and NumPy/SciPy for parallel numerical computing. \url{http://folk.uio.no/sturlamo/python/multiprocessing-tutorial.pdf}
- 
+  
+  \bibitem{core} ARK | Intel Coreª i7-3520M Processor (4M Cache, up to 3.60 GHz)
+ \url{http://ark.intel.com/products/64893}
 \end{thebibliography}
 
 \end{document}
