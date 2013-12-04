@@ -24,6 +24,11 @@
 \usepackage{hyphenat}
 \usepackage{hyperref}
 \usepackage{titlesec}
+\usepackage{lipsum}
+\usepackage{array}
+
+% Wrap and centering multicolumn
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
 
 % Change caption settings
 \usepackage[font=footnotesize,labelfont=bf]{caption}
@@ -163,6 +168,36 @@ measures as follows:
 
 \subsection{Parallelization}
 \subsection{Results and Analysis}
+
+\begin{table*}[t]
+\footnotesize
+\begin{tabular}{lrrrrrr}
+\multicolumn{1}{C{4em}}{\bf thread/process=8} &
+\multicolumn{1}{C{5em}}{\bf proc time} &
+\multicolumn{1}{C{5em}}{\bf real time} &
+\multicolumn{1}{C{5em}}{\bf user time} &
+\multicolumn{1}{C{5em}}{\bf sys time} &
+\multicolumn{1}{C{8em}}{\bf user time (work processes)} &
+\multicolumn{1}{C{8em}}{\bf sys time (worker processes)} \\
+\hline
+cpu\_bound.mt & 21.1661 & 21.6565 & 19.1419 & 8.4130 & N/A & N/A  \\
+cpu\_bound.mp & 7.1837 & 7.6333 & 0.2066 & 0.1090 & 23.8242 & 0.3836 \\
+cpu\_bound.omp & 10.4938 & 10.9693 & 39.0557 & 0.1261 & N/A & N/A \\
+io\_bound.mt & 2.9933 & 3.8690 & 0.8993 & 0.1509 & N/A & N/A \\
+io\_bound.mp & 16.4212 & 17.2963 & 0.6450 & 0.1209 & 0.3836 & 0.1307 \\
+io\_bound.omp & 2.9347 & 3.7645 & 0.8770 & 0.1439 & N/A & N/A \\
+memory\_bound.mt & 19.7836 & 20.3949 & 19.1920 & 2.6024 & N/A & N/A \\
+memory\_bound.mp & 8.2920 & 8.9134 & 0.3793 & 1062 & 31.9653 & 0.1055 \\
+memory\_bound.omp & 0.7290 & 1.3544 & 3.2256 & 0.1005 & N/A & N/A \\
+overhead.mt & 0.1348 & 0.5210 & 0.2539 & 0.1660 & N/A & N/A \\
+overhead.mp & 4.2435 & 4.7062 & 0.2252 & 0.1375 & 3.6614 & 2.5615 \\
+overhead.omp & 0.0983 & 0.5214 & 0.2232 & 0.1500 & N/A & N/A \\
+\end{tabular}
+\caption{Performance at peak F-measure}
+\end{table*}
+%\lipsum[1-20]
+
+
 timing: real time
 user / system time
 profiling
