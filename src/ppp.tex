@@ -21,6 +21,7 @@
 
 \documentclass[letterpaper,twocolumn,10pt]{article}
 \usepackage{usenix, epsfig,endnotes}
+\usepackage{amsmath}
 \usepackage{hyphenat}
 \usepackage{hyperref}
 \usepackage{titlesec}
@@ -171,44 +172,51 @@ The parallelization is done by using each approach to implement the parallel par
 To create multiple threads, the \verb#threading# programs always employ \verb#Thread# by specifying the \textit{target} and \textit{args} arguments with a worker function and its parameters respectively, without declaring the \verb#Thread# class. Nearly all types of data structures in this approach will be the same to those in the sequential program, which involves Python built-ins such as list and dictionary. \verb#Queue.Queue# will be used to implement multi-consumer queue for the I/O-bound programs that adopts the thread pool pattern.
 
 The \verb#multiprocessing# approach follows the similar process creation method to \verb#threading#. It involves many shared-memory data structures that are ready-to-use Python built-ins, such as \verb#Value#, \verb#Array# and other types of supported by the \verb#Manager# object.
+In the I/O-bound parallelization, the \verb#multiprocessing.Queue()# is the counterpart of \verb#Queue.Queue# in the \verb#threading# approach.
+
+The Cython/OpenMP approach...
+
+The I/O-bound... The CPU-bound and overhead...
+
+Similar pattern for observation. All approaches divide tasks into chunks (cpu-bound, memory-bound, overhead), or use thread pool pattern (io-bound)
 
 \subsection{Results and Analysis}
 \begin{figure}[h!]
 
   \centering
     \includegraphics[width=24em]{../img/cpu_bound.png}
-      \caption{A picture of a gull.}
+      \caption{CPU-bound}
 \end{figure}
 
 \begin{figure}[h!]
 
   \centering
     \includegraphics[width=24em]{../img/io_bound.png}
-      \caption{A picture of a gull.}
+      \caption{I/O-bound}
 \end{figure}
 
 \begin{figure}[h!]
   \centering
     \includegraphics[width=24em]{../img/memory_bound_1.png}
-      \caption{A picture of a gull.}
+      \caption{Memory-bound (1)}
 \end{figure}
 
 \begin{figure}[h!]
   \centering
     \includegraphics[width=24em]{../img/memory_bound_2.png}
-      \caption{A picture of a gull.}
+      \caption{Memory-bound (2)}
 \end{figure}
 
 \begin{figure}[h!]
   \centering
     \includegraphics[width=24em]{../img/overhead_1.png}
-      \caption{A picture of a gull.}
+      \caption{Overhead analysis (1)}
 \end{figure}
 
 \begin{figure}[h!]
   \centering
     \includegraphics[width=24em]{../img/overhead_2.png}
-      \caption{A picture of a gull.}
+      \caption{Overhead analysis (2)}
 \end{figure}
 
 \begin{table*}[t]
@@ -238,13 +246,57 @@ overhead.mp & 4.2435 & 4.7062 & 0.2252 & 0.1375 & \bf 3.6614 & 2.5615 \\
 overhead.omp & 0.0983 & 0.5214 & \bf 0.2232 & 0.1500 & - & - \\
 \hline
 \end{tabular}
-\caption{Performance at peak F-measure}
+\caption{Parallelism analysis over user/sys timing}
 \end{table*}
+
+
+
+
+Development efficiency
+Statistical: 1. $L$: Total lines of code; 2. $M$ mccabe complexity: $(c - 2)\times n $ 3. $I$ Additional interfaces used 4. $C$ Lines of code in converting data structure for input and output 5. $E$ Extra configuration 
+
+The formula for development effort  will be
+\begin{equation}
+	D = L + M + I + (C + E)\times 2
+\end{equation}
 \lipsum[1-20]
 
 
-timing: real time
-user / system time
+
+
+
+
+
+
+\begin{table*}
+\centering
+\footnotesize
+\begin{tabular}{|l|rrrrrr|}
+\hline 
+\multicolumn{1}{|C{4em}|}{\bf program} &
+\multicolumn{1}{C{5em}}{\bf proc time} &
+\multicolumn{1}{C{5em}}{\bf real time} &
+\multicolumn{1}{C{5em}}{\bf user time} &
+\multicolumn{1}{C{5em}}{\bf system time} &
+\multicolumn{1}{C{5em}}{\bf user time (worker processes)} &
+\multicolumn{1}{C{6em}|}{\bf system time (worker processes)} \\
+\hline
+cpu\_bound.mt & 21.1661 & 21.6565 & \bf 19.1419 & 8.4130 & - & -  \\
+cpu\_bound.mp & 7.1837 & 7.6333 & 0.2066 & 0.1090 & \bf 23.8242 & 0.3836 \\
+cpu\_bound.omp & 10.4938 & 10.9693 & \bf 39.0557 & 0.1261 & - & - \\
+io\_bound.mt & 2.9933 & 3.8690 & 0.8993 & 0.1509 & - & - \\
+io\_bound.mp & 16.4212 & 17.2963 & \bf 0.6450 & 0.1209 & 0.3836 & 0.1307 \\
+io\_bound.omp & 2.9347 & 3.7645 & \bf 0.8770 & 0.1439 & - & - \\
+memory\_bound.mt & 19.7836 & 20.3949 & \bf 19.1920 & 2.6024 & - & - \\
+memory\_bound.mp & 8.2920 & 8.9134 & 0.3793 & 0.1062 & \bf 31.9653 & 0.1055 \\
+memory\_bound.omp & 0.7290 & 1.3544 & \bf 3.2256 & 0.1005 & - & - \\
+overhead.mt & 0.1348 & 0.5210 & \bf 0.2539 & 0.1660 & - & - \\
+overhead.mp & 4.2435 & 4.7062 & 0.2252 & 0.1375 & \bf 3.6614 & 2.5615 \\
+overhead.omp & 0.0983 & 0.5214 & \bf 0.2232 & 0.1500 & - & - \\
+\hline
+\end{tabular}
+\caption{Parallelism analysis over user/sys timing}
+\end{table*}
 profiling
 \section{Conclusion}
 
