@@ -28,7 +28,7 @@
 \usepackage{array}
 
 % Wrap and centering multicolumn
-\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}m{#1}}
 
 % Change caption settings
 \usepackage[font=footnotesize,labelfont=bf]{caption}
@@ -52,7 +52,7 @@
 
 \begin{document}
 \fontsize{9pt}{11pt}\selectfont
-\hyphenation{}
+\hyphenation{DevOps}
 %don't want date printed
 \date{}
 
@@ -107,11 +107,11 @@ Despite the fact that \verb#threading#, \verb#multiprocessing# and Cython/OpenMP
 
 Parallelizing Python programs does not have much difference from parallelizing programs in other languages. It is a common approach to identify parallelism, enforce dependencies and handle synchronization. The essential part is to think of the problem in terms of a Python programmer who wants things done in the most ``intuitive way''. This means it is better to use the simplest supported interfaces (packages, modules, functions and data structures) that is clearly understandable with least coding and debugging effort while ensuring correctness. 
 
-When implementing a parallel version using one approach, comparable counterparts of other approaches should be taken into account. For example, when implementing a global list with the \verb#threading# approach, the correspondingly applicable data structures  in \verb#multiprocessing# approach such as Array in shared memory or ListProxy should be considered instead of using other data structures such as Queue with a different implementing logic. Keeping the similarity of logic in this way gives programmers a better observation on the performance.
+When implementing a parallel version using one approach, comparable counterparts of other approaches should be taken into account. For example, when implementing a global list with the \verb#threading# approach, the correspondingly applicable data structures  in \verb#multiprocessing# approach such as Array in shared memory or ListProxy should be considered instead of using other data structures such as \verb#Queue# with a different implementing logic, unless the entire parallel pattern is otherwise different. Keeping the similarity of logic in this way gives programmers a better observation on the performance.
 
-However, the above rule has a disadvantage that may cause loss in performance when implementing other approaches. In Cython, for instance, the global interpreter lock (GIL) cannot be released if manipulating Python built-ins or objects in parallel sections, which makes it impossible to achieve native parallelism. Therefore, a better solution is to find a balance that deals with both aspects and put the analysis of annoying factors into an independent experiment. As a promising result, further parallelization can be performed to demonstrate the side-effects compared to the serial version, such as GIL restrictions, overhead in managing threads or processes, and contentions in using locks.
+However, the above rule has a disadvantage that may cause loss in performance when implementing other approaches. In Cython, for instance, the global interpreter lock (GIL) cannot be released if manipulating Python built-ins or objects in parallel sections, which makes it impossible to achieve native parallelism. Therefore, a better solution is to find a balance that deals with both aspects and put the analysis of annoying factors into an independent experiment. As a promising result, further parallelization can be performed to demonstrate the side-effects compared to the serial version, such as GIL restrictions, overhead in managing threads or processes, and contentions in using locks, which will be included in the overhead analysis programs.
 
-With the abovementioned parallelization work done, comparison of the parallelized programs makes more sense, particularly in two major criteria: development efficiency and performance. The complexity of the parallelized program, which may be reflected by total number of lines of code, determines the primary development effort. The compatibility is also one aspect that programmers pay much attention to in order to interface with existing applications. This generally involves the conversion of data structures under these approaches. Unlike scripting, Cython/OpenMP requires extra setup script and compile procedure that is platform-dependent, which also affects development efficiency.
+With the abovementioned parallelization work done, comparison of the parallelized programs makes more sense, particularly in two major criteria: development efficiency and performance. The complexity of the parallelized program, which may be reflected by many factors such as total number of lines of code, determines the primary development effort. The compatibility is also one aspect that programmers pay much attention to in order to interface with existing applications. This generally involves the conversion of data structures under these approaches. Unlike scripting, Cython/OpenMP requires extra setup script and compile procedure that is platform-dependent, which also affects development efficiency with increased DevOps workload and portability impact.
 
 Besides development, the performance is important in most cases and is obtained by benchmarking. It provides basis on which the overhead, produced by various factors such as thread/process creation and scheduling, the GIL and data structures, can be analyzed. By comparing the performances of the implementation of these approaches, the overall applicability of each approach can be determined, which comprises the ultimate goal of this paper. 
 
@@ -121,43 +121,58 @@ The experiments will be conducted on a MacBook Pro with an Intel Core i7 (2.9 GH
 
 
 \subsection{Experimental Applications}
-There are four groups of applications under study in the experiments. Each group has an original sequential program labeled as \verb#serial# and its parallelized versions using \verb#threading#, \verb#multiprocessing#, and Cython/OpenMP approaches. The following paragraphs in this subsection gives descriptions of each application group as for what tasks they are doing. The parallelization procedure will be discussed in the \textbf{Experiments and Discussion} section.
+There are four groups of applications under study in the experiments. Each group has an original sequential program labeled as \textit{serial} and its parallelized versions using \verb#threading#, \verb#multiprocessing#, and Cython/OpenMP approaches, which are labeled as \textit{mt}, \textit{mp}, and \textit{omp} respectively. The following paragraphs in this subsection gives descriptions of each application group as for what tasks they are doing. The parallelization procedure will be discussed in the \textbf{Experiments and Discussion} section.
 
- \textbf{CPU-bound} (\verb#cpu_bound#). This application performs a time-consuming task that processes a freshly generated file of data. The file contains lines of origin, destination and in-between distance that are represented in random integers. The task is to remove the duplicate appearances of origin and destination and fix the distance of those lines where origin and destination are reversed to generate a consistent list. The program is expected to be CPU-bound which can be ensured using \verb#psutil# (discussed in the next subsection).
+ \textbf{CPU-bound}. This application performs a time-consuming task that processes a freshly generated file of data. The file contains lines of origin, destination and in-between distance that are represented in random integers. The task is to remove the duplicate appearances of origin and destination and fix the distance of those lines where origin and destination are reversed to generate a consistent list. The program is expected to be CPU-bound which can be ensured using \verb#psutil# (discussed in the next subsection).
   
- \textbf{I/O-bound} (\verb#io_bound#). This application is a simple word parser that checks whether each possible combinations of words in the input sentence or paragraph comprises an accessible title of article on Wikipedia. It performs HTTP GET requests to the Wikipedia API to analyze the returned JSON responses and generates the output which lists all titles of the accessible entries.
+ \textbf{I/O-bound}. This application is a simple word parser that checks whether each possible combinations of words in the input sentence or paragraph comprises an accessible title of article on Wikipedia. It performs a large amount of successive HTTP GET requests to the Wikipedia API to analyze the returned JSON responses and generates the output which lists all titles of the accessible entries.
   
- \textbf{Memory-bound} (\verb#memory_bound#). This is a matrix multiplication program that manipulates large matrices. Two random matrices are multiplied and the result product is generated. Although in practice this program is not necessarily memory-bound (otherwise must be CPU-bound), it is assumed to be memory-bound due to the nature of matrix-vector multiplication. With simplicity in the source code, this program is also applicable to the illustration of statically and dynamically typed comparison between Python and Cython.
+ \textbf{Memory-bound}. This is a trivial matrix multiplication program that manipulates large matrices, where two random matrices are multiplied. Although in practice this program is not necessarily memory-bound (otherwise must be CPU-bound), it is assumed to be memory-bound due to the nature of matrix-vector multiplication. With simplicity in the source code, this program is also applicable to the illustration of statically and dynamically typed comparison in Python and Cython.
   
- \textbf{Overhead analysis} (\verb#overhead#). This one is derived from the CPU-bound program but does a different task. It processes the output from the CPU-bound program and perform calculations. After that, it outputs the maximum and minimum distances in that list as well as a list of origin and destination, each with the smallest in-between distance. As the task is not time-consuming, the parallelism will not gain any speedup but brings overhead. The parallelized programs will illustrate the overhead of thread/process management and different data structures supported in \verb#multiprocessing#.
+ \textbf{Overhead analysis}. This one is derived from the CPU-bound program but does a different task. It processes the output from the CPU-bound program and performs calculations. After that, it outputs the maximum and minimum distances in that list as well as a list of origin and destination, each with the smallest in-between distance. As the task is not time-consuming, the parallelism in general will not gain any speedup but brings overhead. The parallelized programs can illustrate the overhead generated in the thread/process management and from using different data structures supported in \verb#multiprocessing#.
 
 \subsection{Profilers and Benchmarks}
 In the experiments, the following tools will be used to profile and benchmark programs after parallelization.
 
 
-The \verb#time# function of Python's \verb#time# module will be used for timing programs (real time). The programs are non-trivial, so it is better to measure the wall-clock time to reflect the production environment. This is primary benchmark that comprises most of the evaluation result.
+The \verb#time# function of Python's \verb#time# module will be used for timing programs (real time). The programs are non-trivial, so it is better to measure the wall-clock time to reflect the production environment. This is the primary benchmark that comprises most of the evaluation results.
 
-To further measure user and system times of the processes for analysis purpose, \verb#psutil# will be used as a general process status utility used in a programmatic manner \cite{psutil}. It is used to determine the types of programs by checking CPU usage and network connections. \verb#cProfile#, the standard profiler for Python, will be used to provide deterministic profiling for the programs to find bottlenecks.
+To further measure user and system times of the processes for analysis purpose, \verb#psutil# will be used as a general process status utility in a programmatic way \cite{psutil}. It can also be used to help determine the types of programs by checking CPU usage and network connections. \verb#cProfile#, the standard profiler for Python, will be used to provide deterministic profiling for the programs to find bottlenecks.
 
-As one of the major comparison criteria in the parallelization experiments, development efficiency needs manual evaluation from a different analysis perspective from that of performance. This means some subjectiveness may be related to conclude this criteria, such as programming effort to ensure interface compatibility and debugging difficulty (such as Cython's compile time check). However, code checking tools such as \textit{flake8} \cite{flake8} and \textit{cloc} \cite{cloc} will still be used to help measure development efficiency by providing substantial statistics like McCabe complexity (cyclomatic complexity) and lines of code.
+As one of the major comparison criterion in the parallelization experiments, development efficiency needs manual evaluation from a different analysis perspective from that of performance. This means some subjectiveness may be included, such as programming effort to ensure interface compatibility and debugging difficulty (such as Cython's compile time check). However, code checking tools such as \textit{flake8} \cite{flake8} and \textit{cloc} \cite{cloc} will still be used to help measure development efficiency by providing substantial statistics like McCabe complexity (cyclomatic complexity) and lines of code.
 
 
 \section{Experiments and Discussion}
-The development efficiency and performances are major measures to make an evaluation overview of the parallelizing methods. 
+The development efficiency and performance are two major measures to make an evaluation overview of the parallelizing methods. 
 
-Development efficiency is evaluated by comparing the parallelized source code with the sequential and measure the specific criteria: 1. The number of additional necessary interface used to perform parallelization and ensure correctness (thread-safe) 2. Extra effort to take to ensure interface compatibility with the original program; 3. Extra configuration and debugging steps; 4. Incremented complexity of the program.
+Development efficiency is evaluated by comparing the parallelized source code with the original sequential one and measuring specific criteria as follows:
 
-Performance is evaluated: 1. Real time to run the parallelized program to see how much speedup or overhead is brought; 2. User/system time (larger than real time) and of the multi-threaded and multi-processing program to see how much parallelism is brought (particularly for OpenMP);
+\begin{itemize}
+\setlength{\itemsep}{0em}
+  \item Number of additional necessary interfaces used to perform parallelization and to ensure correctness (thread-safe);
+  \item Effort to ensure interface compatibility with the original program;
+  \item Extra configuration and debugging steps for the parallelized program; 
+  \item Increment in the program complexity.
+\end{itemize}
 
+Performance is evaluated from the timing perspective with the following criteria:
 
-The expected results are case dependent, but can be generalized in terms of these measures
+\begin{itemize}
+\setlength{\itemsep}{0em}
+  \item Real time to run the parallelized programs, which reflects how much speedup or overhead it has actually brought;
+  \item User/system timing of the parallelized programs, which reflects how much actual parallelism is brought;
+\end{itemize}
 
-Development efficiency: \verb#threading# always have less coding effort and better compatibility than the other two, while Cython/OpenMP requires the most effort.
+The expected results are case dependent but can be generalized. In development efficiency, \verb#threading# should always have less coding effort and better compatibility than the other two, while Cython/OpenMP requires the most effort and thus provides least efficiency. In performance, \verb#multiprocessing# and Cython/OpenMP generally performs better than \verb#threading# in CPU intensive tasks, but \verb#threading# and Cython/OpenMP performs better in I/O-bound programs. In terms of parallelism, however, only Cython/OpenMP and \verb#multiprocessing# will bring native parallelism, while \verb#threading# cannot due to the restriction of GIL.
 
-Performance: In terms of real time, \verb#multiprocessing# and Cython/OpenMP generally performs better than \verb#threading# in CPU intensive tasks, but \verb#threading# and Cython/OpenMP performs better in I/O-bound programs. In terms of parallelism, only Cython/OpenMP and \verb#multiprocessing# will bring native parallelism, while \verb#threading# cannot due to the restriction of GIL
+\subsection{Parallelization}
+The parallelization is done by using each approach to implement the parallel part in each application group. This parallel part is derived from a function in the sequential program that basically works as an modularized interface. In the source code, this function is \verb#proc()# (abbreviation of \textit{processing}), which executes the parallel tasks by processing the common input and generating output, both of which are usually globally defined. As few lines of code as possible will be used in the implementation to keep a simplest logic to ensure interface compatibility and correctness.
 
+To create multiple threads, the \verb#threading# programs always employ \verb#Thread# by specifying the \textit{target} and \textit{args} arguments with a worker function and its parameters respectively, without declaring the \verb#Thread# class. Nearly all types of data structures in this approach will be the same to those in the sequential program, which involves Python built-ins such as list and dictionary. \verb#Queue.Queue# will be used to implement multi-consumer queue for the I/O-bound programs that adopts the thread pool pattern.
 
-measures as follows: 
+The \verb#multiprocessing# approach follows the similar process creation method to \verb#threading#. It involves many shared-memory data structures that are ready-to-use Python built-ins, such as \verb#Value#, \verb#Array# and other types of supported by the \verb#Manager# object.
+
+\subsection{Results and Analysis}
 \begin{figure}[h!]
 
   \centering
@@ -165,37 +180,67 @@ measures as follows:
       \caption{A picture of a gull.}
 \end{figure}
 
+\begin{figure}[h!]
 
-\subsection{Parallelization}
-\subsection{Results and Analysis}
+  \centering
+    \includegraphics[width=24em]{../img/io_bound.png}
+      \caption{A picture of a gull.}
+\end{figure}
+
+\begin{figure}[h!]
+  \centering
+    \includegraphics[width=24em]{../img/memory_bound_1.png}
+      \caption{A picture of a gull.}
+\end{figure}
+
+\begin{figure}[h!]
+  \centering
+    \includegraphics[width=24em]{../img/memory_bound_2.png}
+      \caption{A picture of a gull.}
+\end{figure}
+
+\begin{figure}[h!]
+  \centering
+    \includegraphics[width=24em]{../img/overhead_1.png}
+      \caption{A picture of a gull.}
+\end{figure}
+
+\begin{figure}[h!]
+  \centering
+    \includegraphics[width=24em]{../img/overhead_2.png}
+      \caption{A picture of a gull.}
+\end{figure}
 
 \begin{table*}[t]
+\centering
 \footnotesize
-\begin{tabular}{lrrrrrr}
-\multicolumn{1}{C{4em}}{\bf thread/process=8} &
+\begin{tabular}{|l|rrrrrr|}
+\hline 
+\multicolumn{1}{|C{4em}|}{\bf program} &
 \multicolumn{1}{C{5em}}{\bf proc time} &
 \multicolumn{1}{C{5em}}{\bf real time} &
 \multicolumn{1}{C{5em}}{\bf user time} &
-\multicolumn{1}{C{5em}}{\bf sys time} &
-\multicolumn{1}{C{8em}}{\bf user time (work processes)} &
-\multicolumn{1}{C{8em}}{\bf sys time (worker processes)} \\
+\multicolumn{1}{C{5em}}{\bf system time} &
+\multicolumn{1}{C{5em}}{\bf user time (worker processes)} &
+\multicolumn{1}{C{6em}|}{\bf system time (worker processes)} \\
 \hline
-cpu\_bound.mt & 21.1661 & 21.6565 & 19.1419 & 8.4130 & N/A & N/A  \\
-cpu\_bound.mp & 7.1837 & 7.6333 & 0.2066 & 0.1090 & 23.8242 & 0.3836 \\
-cpu\_bound.omp & 10.4938 & 10.9693 & 39.0557 & 0.1261 & N/A & N/A \\
-io\_bound.mt & 2.9933 & 3.8690 & 0.8993 & 0.1509 & N/A & N/A \\
-io\_bound.mp & 16.4212 & 17.2963 & 0.6450 & 0.1209 & 0.3836 & 0.1307 \\
-io\_bound.omp & 2.9347 & 3.7645 & 0.8770 & 0.1439 & N/A & N/A \\
-memory\_bound.mt & 19.7836 & 20.3949 & 19.1920 & 2.6024 & N/A & N/A \\
-memory\_bound.mp & 8.2920 & 8.9134 & 0.3793 & 1062 & 31.9653 & 0.1055 \\
-memory\_bound.omp & 0.7290 & 1.3544 & 3.2256 & 0.1005 & N/A & N/A \\
-overhead.mt & 0.1348 & 0.5210 & 0.2539 & 0.1660 & N/A & N/A \\
-overhead.mp & 4.2435 & 4.7062 & 0.2252 & 0.1375 & 3.6614 & 2.5615 \\
-overhead.omp & 0.0983 & 0.5214 & 0.2232 & 0.1500 & N/A & N/A \\
+cpu\_bound.mt & 21.1661 & 21.6565 & \bf 19.1419 & 8.4130 & - & -  \\
+cpu\_bound.mp & 7.1837 & 7.6333 & 0.2066 & 0.1090 & \bf 23.8242 & 0.3836 \\
+cpu\_bound.omp & 10.4938 & 10.9693 & \bf 39.0557 & 0.1261 & - & - \\
+io\_bound.mt & 2.9933 & 3.8690 & 0.8993 & 0.1509 & - & - \\
+io\_bound.mp & 16.4212 & 17.2963 & \bf 0.6450 & 0.1209 & 0.3836 & 0.1307 \\
+io\_bound.omp & 2.9347 & 3.7645 & \bf 0.8770 & 0.1439 & - & - \\
+memory\_bound.mt & 19.7836 & 20.3949 & \bf 19.1920 & 2.6024 & - & - \\
+memory\_bound.mp & 8.2920 & 8.9134 & 0.3793 & 0.1062 & \bf 31.9653 & 0.1055 \\
+memory\_bound.omp & 0.7290 & 1.3544 & \bf 3.2256 & 0.1005 & - & - \\
+overhead.mt & 0.1348 & 0.5210 & \bf 0.2539 & 0.1660 & - & - \\
+overhead.mp & 4.2435 & 4.7062 & 0.2252 & 0.1375 & \bf 3.6614 & 2.5615 \\
+overhead.omp & 0.0983 & 0.5214 & \bf 0.2232 & 0.1500 & - & - \\
+\hline
 \end{tabular}
 \caption{Performance at peak F-measure}
 \end{table*}
-%\lipsum[1-20]
+\lipsum[1-20]
 
 
 timing: real time
