@@ -212,8 +212,6 @@ The performance of each approach is evaluated against all programs parallelized.
       \caption{CPU-bound}
 \end{figure}
 
-In the evaluation of CPU-bound application group (Figure 1), the behaviors of the approaches is diversified. The \textit{mt} approach is sensitive to the number of threads ($n$) and produce much overhead as $n$ increases exponentially.  Figure 2 shows the profile results of the  \textit{mt} approach, ordered by \textit{tottime}, which is the total time spent in the given function (and excluding time made in calls to sub-functions). Significant time is spent on "acquire" method of "thread.lock" objects, which is a major cause of the overhead generated during thread switching. This essentially due to the fact the GIL ensures that only one thread runs in the Python interpreter at once and only the thread that has acquired the GIL may operate on Python objects or call Python/C API function \cite{gil}. The $mp$ approach performs better as $n$ increases because the subprocesses can run simultaneously without being restricted by the GIL. Though overhead is produced especially when $n$ is large, parallelism predominates so that the speedup is obvious. The \textit{omp (no GIL)} approach behaves somewhat opposite to \textit{mp}.
-
 \begin{figure*}[t]
 \centering
 
@@ -227,8 +225,13 @@ ncalls  tottime  percall  cumtime  percall filename:lineno(function)
   128    0.011    0.000    0.011    0.000 {thread.start_new_thread}
   256    0.010    0.000    0.010    0.000 threading.py:185(__init__)
 \end{alltt}
- \caption{cProfile}
+ \caption{cProfile result of \textit{mt} approach in the CPU-bound application group}
 \end{figure*}
+
+
+In the evaluation of CPU-bound application group (Figure 1), the behaviors of the approaches is diversified. The \textit{mt} approach is sensitive to the number of threads ($n$) and produces much overhead as $n$ increases exponentially.  Figure 2 shows the profile results of the  \textit{mt} approach, ordered by \textit{tottime}, which is the total time spent in the given function (and excluding time made in calls to sub-functions). Significant time is spent on \textit{acquire} method of \textit{thread.lock} objects, which is a major cause of the overhead generated during thread switching. This is essentially due to the fact the GIL ensures that only one thread runs in the Python interpreter at once and only the thread that has acquired the GIL may operate on Python objects or call Python/C API function \cite{gil}. The $mp$ approach performs better as $n$ increases because the subprocesses can run simultaneously without being restricted by the GIL. Though overhead is produced especially when $n$ is large, parallelism predominates so that the speedup is obvious. 
+
+The \textit{omp (no GIL)} approach of the CPU-bound group behaves somewhat opposite to \textit{mp}. The true parallelism does not bring speedup as it cannot efficiently access the \textit{tg} array, which is a memoryview \cite{mv}  on the NumPy array \textit{ntg} (\textit{target\_list}), when multi-threaded (this is the case in this program only, and may not apply to all CPU-bound programs). As seen in Table 1, when $n$ (number of threads) is 8, the total \textit{user time} of \textit{cpu\_bound.omp (no GIL, static type)} is around 39 seconds, which indicates the average \textit{user time} of each thread is around 5. This is even larger than that of the single-threaded \textit{omp (no GIL)} version. The \textit{omp (GIL)} approach, however, makes OpenMP aware of the GIL which wraps all code region within the parallel for loop. This essentially limits the parallelism of OpenMP and it always behaves like single-threaded whatever $n$ is. Both \textit{omp (no GIL)} and \textit{omp (GIL)} operates on statically typed data, so approximate three-times speedup were gained.
 
 \begin{figure}[h!]
 
@@ -236,6 +239,10 @@ ncalls  tottime  percall  cumtime  percall filename:lineno(function)
     \includegraphics[width=24em]{../img/io_bound.png}
       \caption{I/O-bound}
 \end{figure}
+
+In the I/O-bound application group (Figure 2), \textit{mt} and \textit{omp (GIL, dynamic)} approaches share similar behaviors. For \textit{mt}, when the threads are doing I/O, the GIL is always released \cite{glossary}. Another behavior shows \textit{mp} does not gain much speedup when $n$ is below 8 but gains relatively same speedup as \textit{mt} and \textit{omp (GIL, dynamic)} when $n$ is larger. Through observation, it is found that the subprocesses usually cannot finish their divided chunks of tasks in fairly equal time. Due to the process scheduling, some processes may take extraordinarily longer time to join than the other processes, which becomes the bottleneck. However, when $n$ is larger, each chunk of task is relatively smaller and each process can finish the task in short time before being preempted by the process scheduler.
+
+The behaviors of \textit{mt} and \textit{mp} in the memory-bound application group (Figure 3) can be explained similarly to those in the CPU-bound. When single-threaded, the \textit{omp (no GIL, static type)} and \textit{omp (GIL, static type)} are also similar; the former suffers from overhead when multithreaded. The efficient memory access of the matrices in these two approaches, which is a statically typed memoryview on a 2D NumPy array, brings predominant performance boost. The \textit{omp (GIL, dynamic type)} approach is rather like a counterexample that behaves similarly to \textit{mt}. To further demonstrate the performance gap between two types of data, Figure 4 is made to specifically compare \textit{serial} (sequential) and \textit{omp} approaches with different types.
 
 \begin{figure}[h!]
   \centering
@@ -290,7 +297,7 @@ overhead.mp & 4.2435 & 4.7062 & 0.2252 & 0.1375 & \bf 3.6614 & 2.5615 \\ \hline
 overhead.omp & 0.0983 & 0.5214 & \bf 0.2232 & 0.1500 & - & - \\
 \hline
 \end{tabular}
-\caption{Parallelism analysis over user/sys timing}
+\caption{Parallelism analysis over user/sys timing when $n$ (number of threads or processes) is 8}
 \end{table*}
 
 
@@ -384,6 +391,8 @@ profiling
   \bibitem{cloc} CLOC -- Count Lines of Code. \url{http://cloc.sourceforge.net/}
 
   \bibitem{gil} Thread State and the Global Interpreter Lock. \url{http://docs.python.org/2/c-api/init.html#threads}
+
+  \bibitem{mv} Typed Memoryviews - Cython 0.19.2 documentation. \url{http://docs.cython.org/src/userguide/memoryviews.html}
   
 
 \end{thebibliography}
