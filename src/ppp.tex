@@ -176,14 +176,11 @@ The parallelization is done by using each approach to implement the parallel par
 
 To create multiple threads, the \verb#threading# programs always employ \verb#Thread# by specifying the \textit{target} and \textit{args} arguments with a worker function and its parameters respectively, without declaring the \verb#Thread# class. Nearly all types of data structures in this approach will be the same to those in the sequential program, which involves Python built-ins such as list and dictionary. \verb#Queue.Queue# will be used to implement multi-consumer queue for the I/O-bound programs that adopts the thread pool pattern.
 
-The \verb#multiprocessing# approach follows the similar process creation method to \verb#threading#. It involves many shared-memory data structures that are ready-to-use Python built-in objects, such as \verb#Value#, \verb#Array# and other types of supported by the \verb#Manager# object.
-In the I/O-bound parallelization, the \verb#multiprocessing.Queue()# is the counterpart of \verb#Queue.Queue# in the \verb#threading# approach.
+The \verb#multiprocessing# approach follows the similar process creation method to \verb#threading#. It involves many shared-memory data structures that are ready-to-use Python built-in objects, such as \verb#Value#, \verb#Array# and other types of supported by the \verb#Manager# object. In the I/O-bound parallelization, the \verb#multiprocessing.Queue()# is the counterpart of \verb#Queue.Queue# in the \verb#threading# approach.
 
-The Cython/OpenMP approach...
+The Cython/OpenMP approach introduces C/C++ data types using memoryviews (CPU-bound, memory-bound and overhead) and uses \verb#prange# to construct the OpenMP for loop. The GIL is released in this parallel region. Some variant versions are also created that operates on dynamic types and releases the GIL to study the impact from these factors.
 
-The I/O-bound... The CPU-bound and overhead...
-
-Similar pattern for observation. All approaches divide tasks into chunks (cpu-bound, memory-bound, overhead), or use thread pool pattern (io-bound)
+Similar patterns are used for better observation in each application group. All approaches divide tasks into chunks (CPU-bound, memory-bound and overhead), or use thread pool pattern (I/O-bound).
 
 \subsection{Results and Analysis}
 \subsubsection{Performance}
@@ -240,7 +237,7 @@ The \textit{omp (no GIL)} approach of the CPU-bound group behaves somewhat oppos
       \caption{I/O-bound}
 \end{figure}
 
-In the I/O-bound application group (Figure 2), \textit{mt} and \textit{omp (GIL, dynamic)} approaches share similar behaviors. For \textit{mt}, when the threads are doing I/O, the GIL is always released \cite{glossary}. Another behavior shows \textit{mp} does not gain much speedup when $n$ is below 8 but gains relatively same speedup as \textit{mt} and \textit{omp (GIL, dynamic)} when $n$ is larger. Through observation, it is found that the subprocesses usually cannot finish their divided chunks of tasks in fairly equal time. Due to the process scheduling, some processes may take extraordinarily longer time to join than the other processes, which becomes the bottleneck. However, when $n$ is larger, each chunk of task is relatively smaller and each process can finish the task in short time before being preempted by the process scheduler.
+In the I/O-bound application group (Figure 3), \textit{mt} and \textit{omp (GIL, dynamic)} approaches share similar behaviors. For \textit{mt}, when the threads are doing I/O, the GIL is always released \cite{glossary}. Another behavior shows \textit{mp} does not gain much speedup when $n$ is below 8 but gains relatively same speedup as \textit{mt} and \textit{omp (GIL, dynamic)} when $n$ is larger. Through observation, it is found that the subprocesses usually cannot finish their divided chunks of tasks in fairly equal time. Due to the process scheduling, some processes may take extraordinarily longer time to join than the other processes, which becomes the bottleneck. However, when $n$ is larger, each chunk of task is relatively smaller and each process can finish the task in short time before being preempted by the process scheduler.
 
 \begin{figure}[h!]
   \centering
@@ -254,7 +251,7 @@ In the I/O-bound application group (Figure 2), \textit{mt} and \textit{omp (GIL,
       \caption{Memory-bound (2)}
 \end{figure}
 
-The behaviors of \textit{mt} and \textit{mp} in the memory-bound application group (Figure 3) can be explained similarly to those in the CPU-bound. When single-threaded, the \textit{omp (no GIL, static type)} and \textit{omp (GIL, static type)} are also similar; the former suffers from overhead when multithreaded. The efficient memory access of the matrices in these two approaches, which is a statically typed memoryview on a 2D NumPy array, brings predominant performance boost. The \textit{omp (GIL, dynamic type)} approach is rather like a counterexample that behaves similarly to \textit{mt}. To further demonstrate the performance gap between two types of data, Figure 4 is made to specifically compare \textit{serial} (sequential) and \textit{omp} approaches with different types.
+The behaviors of \textit{mt} and \textit{mp} in the memory-bound application group (Figure 4) can be explained similarly to those in the CPU-bound. When single-threaded, the \textit{omp (no GIL, static type)} and \textit{omp (GIL, static type)} are also similar; the former suffers from overhead when multithreaded. The efficient memory access of the matrices in these two approaches, which is a statically typed memoryview on a 2D NumPy array, brings predominant performance boost. The \textit{omp (GIL, dynamic type)} approach is rather like a counterexample that behaves similarly to \textit{mt}. To further demonstrate the performance gap between two types of data, Figure 5 is made to specifically compare \textit{serial} (sequential) and \textit{omp} approaches with different types.
 
 \begin{figure}[h!]
   \centering
@@ -324,16 +321,9 @@ The formula for incremental development effort ($D$) will be:
 	D = (L + M + I + (C + E)\times 2)
 \end{equation}
 
-The evaluation result is shown in Table 2. It should be noted that Cython/OpenMP require less development effort when implementing trivial program such as the \textbf{memory\_bound}. This may not apply to the production environment.
+The evaluation result is shown in Table 2. Cython/OpenMP approach generally requires more effort mainly due to the extra configurations required by Cython and additional C/C++ interfacing in the source code. It should be noted that Cython/OpenMP require less development effort when implementing trivial program such as the \textit{memory\_bound} because of less complexity and converting lines of code. This may not apply to the production environment.
 
-Other aspects may include debugging difficulties. It's generally harder to debug multi-threaded code than the sequential one. Besides, for Cython, every time the code is changed, it must be re-compiled. If the project is large, this is time-consuming compared to pure Python scripting which is naturally friendly to the print debugging technique. Luckily, Cython comes with an extension \textit{cygdb} for the GNU Debugger that helps users debug Cython code. It can be used along with \textit{pdb} for Python applications built with Cython extensions.
-
-
-easiness, versatility, control to the programmer
-like compile? yes; portability? high, medium, low; 
-
-
-%\lipsum[1-20]
+Other aspects may include debugging difficulties. It's generally harder to debug multi-threaded code than the sequential one. Besides, for Cython, every time the code is changed, it must be re-compiled. If the project is large, this is time-consuming compared to pure Python scripting which is naturally friendly to the ``print debugging'' technique. Luckily, Cython comes with an extension \textit{cygdb} for the GNU Debugger that helps users debug Cython code. It can be used along with \textit{pdb} for Python applications built with Cython extensions.
 
 \begin{table*}[t]
 \centering
@@ -341,11 +331,11 @@ like compile? yes; portability? high, medium, low;
 \begin{tabular}{|l|r|r|r|r|r|r|}
 \hline 
 \multicolumn{1}{|C{5em}|}{\bf Program} &
-\multicolumn{1}{C{5em}|}{\bf Total Incremental LOC ($L$)} &
-\multicolumn{1}{C{5em}|}{\bf Incremental McCabe complexity ($M$)} &
-\multicolumn{1}{C{5em}|}{\bf Additional interfaces ($I$)} &
-\multicolumn{1}{C{5em}|}{\bf Converting LOC ($C$)} &
-\multicolumn{1}{C{5em}|}{\bf Extra config LOC ($E$)} &
+\multicolumn{1}{C{6em}|}{\bf Total Incremental LOC ($L$)} &
+\multicolumn{1}{C{6em}|}{\bf Incremental McCabe complexity ($M$)} &
+\multicolumn{1}{C{6em}|}{\bf Additional interfaces ($I$)} &
+\multicolumn{1}{C{6em}|}{\bf Converting LOC ($C$)} &
+\multicolumn{1}{C{6em}|}{\bf Extra config LOC ($E$)} &
 \multicolumn{1}{C{6em}|}{\bf Incremental development effort ($D$)} \\
 \hline
 \it cpu\_bound.serial & 27 & 6 & - & - & - & - \\ \hline 
@@ -367,18 +357,36 @@ overhead.omp & +44 & +1 & 3 & 17 & 5 & 92 \\ \hline
 \end{tabular}
 \caption{Incremental development effort}
 \end{table*}
-profiling
+
 \section{Conclusion}
 
+\begin{table}
+\centering
+\footnotesize
+\begin{tabular}{|p{7em}|p{4em}|p{5em}|p{4em}|p{4em}|}
+\hline 
+\multicolumn{1}{|C{3em}|}{\bf Approach} &
+\multicolumn{1}{C{3em}|}{\bf Easiness} &
+\multicolumn{1}{C{3em}|}{\bf Performance} &
+\multicolumn{1}{C{3em}|}{\bf Versatility} &
+\multicolumn{1}{C{3em}|}{\bf Control} \\
+\hline
+threading & Very easy & Low & Medium & Full \\ \hline
+multiprocessing & Easy & Medium & High & Full \\ \hline
+Cython/OpenMP & Hard & High & High & Partial \\ \hline
+\end{tabular}
+\caption{Comparison overview of the approaches}
+\end{table}
+An comparison overview of the three approaches is listed in Table 3. The \textit{easiness} column indicates the development efficiency and the \textit{control} means how much control the programmer has.
 
-\section{Future Work}
+As Python modules, \verb#threading# and \verb#multiprocessing# approaches are easier to use to implement multi-threaded or multiprocessing programs. They also give programmers more high-level control due to their full-fledged APIs dedicated to handle concurrent and parallel tasks. Because of the restriction of GIL, however, \verb#threading# cannot achieve true parallelism; it may apply to non-CPU-intensive tasks such as I/O-bound programs that releases the GIL. \verb#multiprocessing# applies to more programs, but suffers much overhead due to the expensiveness of creating and maintaining processes. 
 
-\begin{itemize}
-\setlength{\itemsep}{0em}
-  \item Parallelize the CPU-bound and I/O-bound programs each with all methods. Parallelize the memory-bound program with the latter two methods. 
-  \item Setup the experimental environments and benchmark the serial and parallelized programs
-  \item Analyze the benchmark results and draw conclusions
-\end{itemize}
+Cython/OpenMP approach generally performs better if implemented properly, that is, releasing the GIL and using static type in the parallel region. The native thread-based parallelism and the exclusive option to harness static type of Cython/OpenMP makes it able to achieve expected performance gain in most cases. The disadvantage is that it requires C/C++ style coding and interfacing as well as extra setup scripts and compile procedure, which makes it harder to deploy and maintain under the hand of pure Python developers. 
+
+In production, choosing an appropriate approach largely depends on the types of tasks to do and the development cost to throw in the project. Benchmarking is the most direct and persuasive way to determine the most appropriate approach that applies to a project.
+
+
+
 
 \begin{thebibliography}{10}
 
