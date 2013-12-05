@@ -27,6 +27,7 @@
 \usepackage{titlesec}
 \usepackage{lipsum}
 \usepackage{array}
+\usepackage{alltt}
 
 % Wrap and centering multicolumn
 \newcolumntype{C}[1]{>{\centering\arraybackslash}m{#1}}
@@ -37,7 +38,7 @@
 % Change font and spacing
 \titleformat*{\subsection}{\normalsize\bfseries}
 \titlespacing{\subsection}{0pt}{0.8em}{0.8em}
-
+\titleformat*{\subsubsection}{\small\bfseries}
 
 % Paragraph margin
 \setlength{\parskip}{0.2em}
@@ -148,21 +149,25 @@ The development efficiency and performance are two major measures to make an eva
 
 Development efficiency is evaluated by comparing the parallelized source code with the original sequential one and measuring specific criteria as follows:
 
+\vspace{-0.5em}
 \begin{itemize}
-\setlength{\itemsep}{0em}
+\setlength{\itemsep}{-0.3em}
   \item Number of additional necessary interfaces used to perform parallelization and to ensure correctness (thread-safe);
   \item Effort to ensure interface compatibility with the original program;
   \item Extra configuration and debugging steps for the parallelized program; 
   \item Increment in the program complexity.
 \end{itemize}
+\vspace{-0.5em}
 
 Performance is evaluated from the timing perspective with the following criteria:
 
+\vspace{-0.5em}
 \begin{itemize}
-\setlength{\itemsep}{0em}
+\setlength{\itemsep}{-0.3em}
   \item Real time to run the parallelized programs, which reflects how much speedup or overhead it has actually brought;
   \item User/system timing of the parallelized programs, which reflects how much actual parallelism is brought;
 \end{itemize}
+\vspace{-0.5em}
 
 The expected results are case dependent but can be generalized. In development efficiency, \verb#threading# should always have less coding effort and better compatibility than the other two, while Cython/OpenMP requires the most effort and thus provides least efficiency. In performance, \verb#multiprocessing# and Cython/OpenMP generally performs better than \verb#threading# in CPU intensive tasks, but \verb#threading# and Cython/OpenMP performs better in I/O-bound programs. In terms of parallelism, however, only Cython/OpenMP and \verb#multiprocessing# will bring native parallelism, while \verb#threading# cannot due to the restriction of GIL.
 
@@ -171,7 +176,7 @@ The parallelization is done by using each approach to implement the parallel par
 
 To create multiple threads, the \verb#threading# programs always employ \verb#Thread# by specifying the \textit{target} and \textit{args} arguments with a worker function and its parameters respectively, without declaring the \verb#Thread# class. Nearly all types of data structures in this approach will be the same to those in the sequential program, which involves Python built-ins such as list and dictionary. \verb#Queue.Queue# will be used to implement multi-consumer queue for the I/O-bound programs that adopts the thread pool pattern.
 
-The \verb#multiprocessing# approach follows the similar process creation method to \verb#threading#. It involves many shared-memory data structures that are ready-to-use Python built-ins, such as \verb#Value#, \verb#Array# and other types of supported by the \verb#Manager# object.
+The \verb#multiprocessing# approach follows the similar process creation method to \verb#threading#. It involves many shared-memory data structures that are ready-to-use Python built-in objects, such as \verb#Value#, \verb#Array# and other types of supported by the \verb#Manager# object.
 In the I/O-bound parallelization, the \verb#multiprocessing.Queue()# is the counterpart of \verb#Queue.Queue# in the \verb#threading# approach.
 
 The Cython/OpenMP approach...
@@ -181,12 +186,49 @@ The I/O-bound... The CPU-bound and overhead...
 Similar pattern for observation. All approaches divide tasks into chunks (cpu-bound, memory-bound, overhead), or use thread pool pattern (io-bound)
 
 \subsection{Results and Analysis}
+\subsubsection{Performance}
+
+The performance of each approach is evaluated against all programs parallelized. Firstly, the evaluation is conducted by measuring real times consumed by the \textit{proc()} functions, which is illustrated in Figure 1-6. In these figures, the abbreviated notation in the legend has the following meanings:
+
+\vspace{-0.5em}
+\begin{description}
+\setlength{\itemsep}{0em}
+  \item[\it serial:] original sequential program 
+  \item[\it mt:] parallelized version using \verb#threading# approach
+  \item[\it mp:] parallelized version using \verb#multiprocessing# approach with default shared-memory data types
+  \item[\it \it mp (manager):] \raggedright parallelized version using \verb#multiprocessing# approach with data types supported by \verb#Manager#
+  \item[\it omp:] parallelized version using Cython/OpenMP approach
+  \item[\it omp (GIL):] without releasing the global interpreter lock (GIL)
+  \item[\it omp (no GIL):] releasing the global interpreter lock (GIL)
+  \item[\it omp (static type):] using C/C++ data types
+  \item[\it omp (dynamic type):] using Python data types
+\end{description}
+\vspace{-0.5em}
+
 \begin{figure}[h!]
 
   \centering
     \includegraphics[width=24em]{../img/cpu_bound.png}
       \caption{CPU-bound}
 \end{figure}
+
+In the evaluation of CPU-bound application group (Figure 1), the behaviors of the approaches is diversified. The \textit{mt} approach is sensitive to the number of threads ($n$) and produce much overhead as $n$ increases exponentially.  Figure 2 shows the profile results of the  \textit{mt} approach, ordered by \textit{tottime}, which is the total time spent in the given function (and excluding time made in calls to sub-functions). Significant time is spent on "acquire" method of "thread.lock" objects, which is a major cause of the overhead generated during thread switching. This essentially due to the fact the GIL ensures that only one thread runs in the Python interpreter at once and only the thread that has acquired the GIL may operate on Python objects or call Python/C API function \cite{gil}. The $mp$ approach performs better as $n$ increases because the subprocesses can run simultaneously without being restricted by the GIL. Though overhead is produced especially when $n$ is large, parallelism predominates so that the speedup is obvious. The \textit{omp (no GIL)} approach behaves somewhat opposite to \textit{mp}.
+
+\begin{figure*}[t]
+\centering
+
+\begin{alltt}
+\setlength{\parindent}{4em}
+\small
+ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+  768   16.755    0.022   16.755    0.022 {method 'acquire' of 'thread.lock' objects}
+  128    3.805    0.030   21.515    0.168 threading.py:484(start)
+  128    0.941    0.007   16.305    0.127 threading.py:234(wait)
+  128    0.011    0.000    0.011    0.000 {thread.start_new_thread}
+  256    0.010    0.000    0.010    0.000 threading.py:185(__init__)
+\end{alltt}
+ \caption{cProfile}
+\end{figure*}
 
 \begin{figure}[h!]
 
@@ -222,27 +264,29 @@ Similar pattern for observation. All approaches divide tasks into chunks (cpu-bo
 \begin{table*}[t]
 \centering
 \footnotesize
-\begin{tabular}{|l|rrrrrr|}
+\begin{tabular}{|l|r|r|r|r|r|r|}
 \hline 
-\multicolumn{1}{|C{4em}|}{\bf program} &
-\multicolumn{1}{C{5em}}{\bf proc time} &
-\multicolumn{1}{C{5em}}{\bf real time} &
-\multicolumn{1}{C{5em}}{\bf user time} &
-\multicolumn{1}{C{5em}}{\bf system time} &
-\multicolumn{1}{C{5em}}{\bf user time (worker processes)} &
+\multicolumn{1}{|C{5em}|}{\bf program} &
+\multicolumn{1}{C{5em}|}{\bf proc time} &
+\multicolumn{1}{C{5em}|}{\bf real time} &
+\multicolumn{1}{C{5em}|}{\bf user time} &
+\multicolumn{1}{C{5em}|}{\bf system time} &
+\multicolumn{1}{C{5em}|}{\bf user time (worker processes)} &
 \multicolumn{1}{C{6em}|}{\bf system time (worker processes)} \\
 \hline
-cpu\_bound.mt & 21.1661 & 21.6565 & \bf 19.1419 & 8.4130 & - & -  \\
-cpu\_bound.mp & 7.1837 & 7.6333 & 0.2066 & 0.1090 & \bf 23.8242 & 0.3836 \\
-cpu\_bound.omp & 10.4938 & 10.9693 & \bf 39.0557 & 0.1261 & - & - \\
-io\_bound.mt & 2.9933 & 3.8690 & 0.8993 & 0.1509 & - & - \\
-io\_bound.mp & 16.4212 & 17.2963 & \bf 0.6450 & 0.1209 & 0.3836 & 0.1307 \\
-io\_bound.omp & 2.9347 & 3.7645 & \bf 0.8770 & 0.1439 & - & - \\
-memory\_bound.mt & 19.7836 & 20.3949 & \bf 19.1920 & 2.6024 & - & - \\
-memory\_bound.mp & 8.2920 & 8.9134 & 0.3793 & 0.1062 & \bf 31.9653 & 0.1055 \\
-memory\_bound.omp & 0.7290 & 1.3544 & \bf 3.2256 & 0.1005 & - & - \\
-overhead.mt & 0.1348 & 0.5210 & \bf 0.2539 & 0.1660 & - & - \\
-overhead.mp & 4.2435 & 4.7062 & 0.2252 & 0.1375 & \bf 3.6614 & 2.5615 \\
+cpu\_bound.mt & 21.1661 & 21.6565 & \bf 19.1419 & 8.4130 & - & -  \\ \hline
+cpu\_bound.mp & 7.1837 & 7.6333 & 0.2066 & 0.1090 & \bf 23.8242 & 0.3836 \\ \hline
+cpu\_bound.omp (no GIL, static type) & 10.4938 & 10.9693 & \bf 39.0557 & 0.1261 & - & - \\ \hline
+cpu\_bound.omp (GIL, static type) & 4.115 & 4.5523 & \bf 4.3176 & 0.1308 & - & - \\ \hline
+io\_bound.mt & 2.9933 & 3.8690 & 0.8993 & 0.1509 & - & - \\ \hline
+io\_bound.mp & 16.4212 & 17.2963 & \bf 0.6450 & 0.1209 & 0.3836 & 0.1307 \\ \hline
+io\_bound.omp & 2.9347 & 3.7645 & \bf 0.8770 & 0.1439 & - & - \\ \hline
+memory\_bound.mt & 19.7836 & 20.3949 & \bf 19.1920 & 2.6024 & - & - \\ \hline
+memory\_bound.mp & 8.2920 & 8.9134 & 0.3793 & 0.1062 & \bf 31.9653 & 0.1055 \\ \hline
+memory\_bound.omp (no GIL, static type) & 0.3803 & 1.0390 & \bf 0.7988 & 0.1024 & - & - \\ \hline
+memory\_bound.omp (GIL, static type) & 4.115 & 4.5523 & \bf 4.3176 & 0.1308 & - & - \\ \hline
+overhead.mt & 0.1348 & 0.5210 & \bf 0.2539 & 0.1660 & - & - \\ \hline
+overhead.mp & 4.2435 & 4.7062 & 0.2252 & 0.1375 & \bf 3.6614 & 2.5615 \\ \hline
 overhead.omp & 0.0983 & 0.5214 & \bf 0.2232 & 0.1500 & - & - \\
 \hline
 \end{tabular}
@@ -250,35 +294,30 @@ overhead.omp & 0.0983 & 0.5214 & \bf 0.2232 & 0.1500 & - & - \\
 \end{table*}
 
 
-
-
 Development efficiency
-Statistical: 1. $L$: Total lines of code; 2. $M$ mccabe complexity: $(c - 2)\times n $ 3. $I$ Additional interfaces used 4. $C$ Lines of code in converting data structure for input and output 5. $E$ Extra configuration 
+Statistical: 1. $L$: Total incremental lines of code; 2. $M$ mccabe complexity: $\sum\limits_{i=1}^n (c_i - 2) $ 3. $I$ Additional interfaces used 4. $C$ Lines of code in converting data structure for input and output 5. $E$ Extra configuration 
 
 The formula for development effort  will be
 \begin{equation}
-	D = L + M + I + (C + E)\times 2
+	D = (L + M + I + (C + E)\times 2)
 \end{equation}
 
 Debugging difficulty in Cython is that every time the code is changed, it must be re-complied.
 
+General aspects
+Create a table of descriptive criteria for the three approaches: 
+easiness, versatility, control to the programmer
+like compile? yes; portability? high, medium, low; 
 
-Create a table of descriptive criteria for the three approaches: like compile? yes; portability? high, medium, low; 
+
 \lipsum[1-20]
-
-
-
-
-
-
-
 
 \begin{table*}
 \centering
 \footnotesize
 \begin{tabular}{|l|rrrrrr|}
 \hline 
-\multicolumn{1}{|C{4em}|}{\bf program} &
+\multicolumn{1}{|C{5em}|}{\bf program} &
 \multicolumn{1}{C{5em}}{\bf proc time} &
 \multicolumn{1}{C{5em}}{\bf real time} &
 \multicolumn{1}{C{5em}}{\bf user time} &
@@ -286,17 +325,19 @@ Create a table of descriptive criteria for the three approaches: like compile? y
 \multicolumn{1}{C{5em}}{\bf user time (worker processes)} &
 \multicolumn{1}{C{6em}|}{\bf system time (worker processes)} \\
 \hline
-cpu\_bound.mt & 21.1661 & 21.6565 & \bf 19.1419 & 8.4130 & - & -  \\
-cpu\_bound.mp & 7.1837 & 7.6333 & 0.2066 & 0.1090 & \bf 23.8242 & 0.3836 \\
-cpu\_bound.omp & 10.4938 & 10.9693 & \bf 39.0557 & 0.1261 & - & - \\
-io\_bound.mt & 2.9933 & 3.8690 & 0.8993 & 0.1509 & - & - \\
-io\_bound.mp & 16.4212 & 17.2963 & \bf 0.6450 & 0.1209 & 0.3836 & 0.1307 \\
-io\_bound.omp & 2.9347 & 3.7645 & \bf 0.8770 & 0.1439 & - & - \\
-memory\_bound.mt & 19.7836 & 20.3949 & \bf 19.1920 & 2.6024 & - & - \\
-memory\_bound.mp & 8.2920 & 8.9134 & 0.3793 & 0.1062 & \bf 31.9653 & 0.1055 \\
-memory\_bound.omp & 0.7290 & 1.3544 & \bf 3.2256 & 0.1005 & - & - \\
-overhead.mt & 0.1348 & 0.5210 & \bf 0.2539 & 0.1660 & - & - \\
-overhead.mp & 4.2435 & 4.7062 & 0.2252 & 0.1375 & \bf 3.6614 & 2.5615 \\
+cpu\_bound.mt & 21.1661 & 21.6565 & \bf 19.1419 & 8.4130 & - & -  \\ \hline
+cpu\_bound.mp & 7.1837 & 7.6333 & 0.2066 & 0.1090 & \bf 23.8242 & 0.3836 \\ \hline
+cpu\_bound.omp (no GIL, static type) & 10.4938 & 10.9693 & \bf 39.0557 & 0.1261 & - & - \\ \hline
+cpu\_bound.omp (GIL, static type) & 4.115 & 4.5523 & \bf 4.3176 & 0.1308 & - & - \\ \hline
+io\_bound.mt & 2.9933 & 3.8690 & 0.8993 & 0.1509 & - & - \\ \hline
+io\_bound.mp & 16.4212 & 17.2963 & \bf 0.6450 & 0.1209 & 0.3836 & 0.1307 \\ \hline
+io\_bound.omp & 2.9347 & 3.7645 & \bf 0.8770 & 0.1439 & - & - \\ \hline
+memory\_bound.mt & 19.7836 & 20.3949 & \bf 19.1920 & 2.6024 & - & - \\ \hline
+memory\_bound.mp & 8.2920 & 8.9134 & 0.3793 & 0.1062 & \bf 31.9653 & 0.1055 \\ \hline
+memory\_bound.omp (no GIL, static type) & 0.3803 & 1.0390 & \bf 0.7988 & 0.1024 & - & - \\ \hline
+memory\_bound.omp (GIL, static type) & 4.115 & 4.5523 & \bf 4.3176 & 0.1308 & - & - \\ \hline
+overhead.mt & 0.1348 & 0.5210 & \bf 0.2539 & 0.1660 & - & - \\ \hline
+overhead.mp & 4.2435 & 4.7062 & 0.2252 & 0.1375 & \bf 3.6614 & 2.5615 \\ \hline
 overhead.omp & 0.0983 & 0.5214 & \bf 0.2232 & 0.1500 & - & - \\
 \hline
 \end{tabular}
@@ -341,6 +382,9 @@ profiling
   \bibitem{flake8} Flake8 - flake8 2.0 documentation. \url{https://flake8.readthedocs.org/en/2.0/}
 
   \bibitem{cloc} CLOC -- Count Lines of Code. \url{http://cloc.sourceforge.net/}
+
+  \bibitem{gil} Thread State and the Global Interpreter Lock. \url{http://docs.python.org/2/c-api/init.html#threads}
+  
 
 \end{thebibliography}
 
