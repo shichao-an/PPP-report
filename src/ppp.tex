@@ -54,7 +54,7 @@
 
 \begin{document}
 \fontsize{9pt}{11pt}\selectfont
-\hyphenation{DevOps}
+\hyphenation{DevOps mccabe}
 %don't want date printed
 \date{}
 
@@ -141,7 +141,7 @@ The \verb#time# function of Python's \verb#time# module will be used for timing 
 
 To further measure user and system times of the processes for analysis purpose, \verb#psutil# will be used as a general process status utility in a programmatic way \cite{psutil}. It can also be used to help determine the types of programs by checking CPU usage and network connections. \verb#cProfile#, the standard profiler for Python, will be used to provide deterministic profiling for the programs to find bottlenecks.
 
-As one of the major comparison criterion in the parallelization experiments, development efficiency needs manual evaluation from a different analysis perspective from that of performance. This means some subjectiveness may be included, such as programming effort to ensure interface compatibility and debugging difficulty (such as Cython's compile time check). However, code checking tools such as \textit{flake8} \cite{flake8} and \textit{cloc} \cite{cloc} will still be used to help measure development efficiency by providing substantial statistics like McCabe complexity (cyclomatic complexity) and lines of code.
+As one of the major comparison criterion in the parallelization experiments, development efficiency needs manual evaluation from a different analysis perspective from that of performance. This means some subjectiveness may be included, such as programming effort to ensure interface compatibility and debugging difficulty (such as Cython's compile time check). However, code checking tools such as \textit{flake8} \cite{flake8} and \textit{CLOC} \cite{cloc} will still be used to help measure development efficiency by providing substantial statistics like McCabe complexity (cyclomatic complexity) and lines of code.
 
 
 \section{Experiments and Discussion}
@@ -196,7 +196,7 @@ The performance of each approach is evaluated against all programs parallelized.
   \item[\it serial:] original sequential program 
   \item[\it mt:] parallelized version using \verb#threading# approach
   \item[\it mp:] parallelized version using \verb#multiprocessing# approach with default shared-memory data types
-  \item[\it \it mp (manager):] \raggedright parallelized version using \verb#multiprocessing# approach with data types supported by \verb#Manager#
+  \item[\it mp (manager):] \raggedright parallelized version using \verb#multiprocessing# approach with data types supported by \verb#Manager#
   \item[\it omp:] parallelized version using Cython/OpenMP approach
   \item[\it omp (GIL):] without releasing the global interpreter lock (GIL)
   \item[\it omp (no GIL):] releasing the global interpreter lock (GIL)
@@ -242,8 +242,6 @@ The \textit{omp (no GIL)} approach of the CPU-bound group behaves somewhat oppos
 
 In the I/O-bound application group (Figure 2), \textit{mt} and \textit{omp (GIL, dynamic)} approaches share similar behaviors. For \textit{mt}, when the threads are doing I/O, the GIL is always released \cite{glossary}. Another behavior shows \textit{mp} does not gain much speedup when $n$ is below 8 but gains relatively same speedup as \textit{mt} and \textit{omp (GIL, dynamic)} when $n$ is larger. Through observation, it is found that the subprocesses usually cannot finish their divided chunks of tasks in fairly equal time. Due to the process scheduling, some processes may take extraordinarily longer time to join than the other processes, which becomes the bottleneck. However, when $n$ is larger, each chunk of task is relatively smaller and each process can finish the task in short time before being preempted by the process scheduler.
 
-The behaviors of \textit{mt} and \textit{mp} in the memory-bound application group (Figure 3) can be explained similarly to those in the CPU-bound. When single-threaded, the \textit{omp (no GIL, static type)} and \textit{omp (GIL, static type)} are also similar; the former suffers from overhead when multithreaded. The efficient memory access of the matrices in these two approaches, which is a statically typed memoryview on a 2D NumPy array, brings predominant performance boost. The \textit{omp (GIL, dynamic type)} approach is rather like a counterexample that behaves similarly to \textit{mt}. To further demonstrate the performance gap between two types of data, Figure 4 is made to specifically compare \textit{serial} (sequential) and \textit{omp} approaches with different types.
-
 \begin{figure}[h!]
   \centering
     \includegraphics[width=24em]{../img/memory_bound_1.png}
@@ -255,6 +253,8 @@ The behaviors of \textit{mt} and \textit{mp} in the memory-bound application gro
     \includegraphics[width=24em]{../img/memory_bound_2.png}
       \caption{Memory-bound (2)}
 \end{figure}
+
+The behaviors of \textit{mt} and \textit{mp} in the memory-bound application group (Figure 3) can be explained similarly to those in the CPU-bound. When single-threaded, the \textit{omp (no GIL, static type)} and \textit{omp (GIL, static type)} are also similar; the former suffers from overhead when multithreaded. The efficient memory access of the matrices in these two approaches, which is a statically typed memoryview on a 2D NumPy array, brings predominant performance boost. The \textit{omp (GIL, dynamic type)} approach is rather like a counterexample that behaves similarly to \textit{mt}. To further demonstrate the performance gap between two types of data, Figure 4 is made to specifically compare \textit{serial} (sequential) and \textit{omp} approaches with different types.
 
 \begin{figure}[h!]
   \centering
@@ -268,18 +268,22 @@ The behaviors of \textit{mt} and \textit{mp} in the memory-bound application gro
       \caption{Overhead analysis (2)}
 \end{figure}
 
+The overhead analysis group (Figure 6 and 7) focuses on the circumstances where overhead is predominant. Particularly for \textit{mp} approach, most of the overhead originates from using the shared memory data and locks supported by the \verb#multiprocessing# module. In Figure 7, another comparison between efficiency gap between shared memory and manager implementations of the $mp$ approach. A manager object returned by \verb#Manager()# controls a server process which support arbitrary object types and allows other processes to manipulate them using proxies. It is slower than the shared memory, but can be shared by processes on different computers over a network. \cite{sp} 
+
+Table 1 lists the times for all approaches under the measured application groups. The predominant user times are highlighted. The \textit{cpu\_bound.mp}, \textit{memory\_bound.mp} and \textit{cpu\_bound.omp (no GIL, static type)} lines reveal native parallelism that \verb#multiprocessing# and Cython/OpenMP are able to make. In these lines, the user times are approximately four times the real times, which generally reflects the number of logical cores on the testing machine.
+
 \begin{table*}[t]
 \centering
 \footnotesize
 \begin{tabular}{|l|r|r|r|r|r|r|}
 \hline 
-\multicolumn{1}{|C{5em}|}{\bf program} &
-\multicolumn{1}{C{5em}|}{\bf proc time} &
-\multicolumn{1}{C{5em}|}{\bf real time} &
-\multicolumn{1}{C{5em}|}{\bf user time} &
-\multicolumn{1}{C{5em}|}{\bf system time} &
-\multicolumn{1}{C{5em}|}{\bf user time (worker processes)} &
-\multicolumn{1}{C{6em}|}{\bf system time (worker processes)} \\
+\multicolumn{1}{|C{5em}|}{\bf Program} &
+\multicolumn{1}{C{5em}|}{\bf Proc time} &
+\multicolumn{1}{C{5em}|}{\bf Real time} &
+\multicolumn{1}{C{5em}|}{\bf User time} &
+\multicolumn{1}{C{5em}|}{\bf System time} &
+\multicolumn{1}{C{5em}|}{\bf User time (worker processes)} &
+\multicolumn{1}{C{6em}|}{\bf System time (worker processes)} \\
 \hline
 cpu\_bound.mt & 21.1661 & 21.6565 & \bf 19.1419 & 8.4130 & - & -  \\ \hline
 cpu\_bound.mp & 7.1837 & 7.6333 & 0.2066 & 0.1090 & \bf 23.8242 & 0.3836 \\ \hline
@@ -300,55 +304,68 @@ overhead.omp & 0.0983 & 0.5214 & \bf 0.2232 & 0.1500 & - & - \\
 \caption{Parallelism analysis over user/sys timing when $n$ (number of threads or processes) is 8}
 \end{table*}
 
+\subsubsection{Development Efficiency}
 
-Development efficiency
-Statistical: 1. $L$: Total incremental lines of code; 2. $M$ mccabe complexity: $\sum\limits_{i=1}^n (c_i - 2) $ 3. $I$ Additional interfaces used 4. $C$ Lines of code in converting data structure for input and output 5. $E$ Extra configuration 
+The development efficiency is measured by evaluating incremental development effort, which indicates how much more effort one must make to implement the parallelization compared to the sequential one. The higher the incremental development effort is, the lower the development efficiency will be. To make measurement more accurate in a statistical manner, a formula is defined with the following factors:
 
-The formula for development effort  will be
+\vspace{-0.5em}
+\begin{description}
+\setlength{\itemsep}{0em}
+  \item[\it L:] Total incremental lines of code (LOC), which is the extra LOC to the sequential, measured with \textit{CLOC} \cite{cloc}. 
+  \item[\it M:] Incremental McCabe complexity. Assume the complexity of function $i$ is $c_i$, then the incremental complexity is $\sum\limits_{i=1}^n (c_i - 2) $. It is measured both automatically (with \textit{mccabe} \cite{mccabe}) and manually.
+  \item[\it I:] Additional interfaces used. This is the count of imports of the relative modules.
+  \item[\it C:] LOC in converting data structures of input and output for the function \verb#proc()# that is consistent with the sequential one.
+  \item[\it E:] Extra configurations LOC (referring to Cython setup.py script).
+\end{description}
+\vspace{-0.5em}
+
+The formula for incremental development effort ($D$) will be:
 \begin{equation}
 	D = (L + M + I + (C + E)\times 2)
 \end{equation}
 
-Debugging difficulty in Cython is that every time the code is changed, it must be re-complied.
+The evaluation result is shown in Table 2. It should be noted that Cython/OpenMP require less development effort when implementing trivial program such as the \textbf{memory\_bound}. This may not apply to the production environment.
 
-General aspects
-Create a table of descriptive criteria for the three approaches: 
+Other aspects may include debugging difficulties. It's generally harder to debug multi-threaded code than the sequential one. Besides, for Cython, every time the code is changed, it must be re-compiled. If the project is large, this is time-consuming compared to pure Python scripting which is naturally friendly to the print debugging technique. Luckily, Cython comes with an extension \textit{cygdb} for the GNU Debugger that helps users debug Cython code. It can be used along with \textit{pdb} for Python applications built with Cython extensions.
+
+
 easiness, versatility, control to the programmer
 like compile? yes; portability? high, medium, low; 
 
 
-\lipsum[1-20]
+%\lipsum[1-20]
 
-\begin{table*}
+\begin{table*}[t]
 \centering
 \footnotesize
-\begin{tabular}{|l|rrrrrr|}
+\begin{tabular}{|l|r|r|r|r|r|r|}
 \hline 
-\multicolumn{1}{|C{5em}|}{\bf program} &
-\multicolumn{1}{C{5em}}{\bf proc time} &
-\multicolumn{1}{C{5em}}{\bf real time} &
-\multicolumn{1}{C{5em}}{\bf user time} &
-\multicolumn{1}{C{5em}}{\bf system time} &
-\multicolumn{1}{C{5em}}{\bf user time (worker processes)} &
-\multicolumn{1}{C{6em}|}{\bf system time (worker processes)} \\
+\multicolumn{1}{|C{5em}|}{\bf Program} &
+\multicolumn{1}{C{5em}|}{\bf Total Incremental LOC ($L$)} &
+\multicolumn{1}{C{5em}|}{\bf Incremental McCabe complexity ($M$)} &
+\multicolumn{1}{C{5em}|}{\bf Additional interfaces ($I$)} &
+\multicolumn{1}{C{5em}|}{\bf Converting LOC ($C$)} &
+\multicolumn{1}{C{5em}|}{\bf Extra config LOC ($E$)} &
+\multicolumn{1}{C{6em}|}{\bf Incremental development effort ($D$)} \\
 \hline
-cpu\_bound.mt & 21.1661 & 21.6565 & \bf 19.1419 & 8.4130 & - & -  \\ \hline
-cpu\_bound.mp & 7.1837 & 7.6333 & 0.2066 & 0.1090 & \bf 23.8242 & 0.3836 \\ \hline
-cpu\_bound.omp (no GIL, static type) & 10.4938 & 10.9693 & \bf 39.0557 & 0.1261 & - & - \\ \hline
-cpu\_bound.omp (GIL, static type) & 4.115 & 4.5523 & \bf 4.3176 & 0.1308 & - & - \\ \hline
-io\_bound.mt & 2.9933 & 3.8690 & 0.8993 & 0.1509 & - & - \\ \hline
-io\_bound.mp & 16.4212 & 17.2963 & \bf 0.6450 & 0.1209 & 0.3836 & 0.1307 \\ \hline
-io\_bound.omp & 2.9347 & 3.7645 & \bf 0.8770 & 0.1439 & - & - \\ \hline
-memory\_bound.mt & 19.7836 & 20.3949 & \bf 19.1920 & 2.6024 & - & - \\ \hline
-memory\_bound.mp & 8.2920 & 8.9134 & 0.3793 & 0.1062 & \bf 31.9653 & 0.1055 \\ \hline
-memory\_bound.omp (no GIL, static type) & 0.3803 & 1.0390 & \bf 0.7988 & 0.1024 & - & - \\ \hline
-memory\_bound.omp (GIL, static type) & 4.115 & 4.5523 & \bf 4.3176 & 0.1308 & - & - \\ \hline
-overhead.mt & 0.1348 & 0.5210 & \bf 0.2539 & 0.1660 & - & - \\ \hline
-overhead.mp & 4.2435 & 4.7062 & 0.2252 & 0.1375 & \bf 3.6614 & 2.5615 \\ \hline
-overhead.omp & 0.0983 & 0.5214 & \bf 0.2232 & 0.1500 & - & - \\
-\hline
+\it cpu\_bound.serial & 27 & 6 & - & - & - & - \\ \hline 
+cpu\_bound.mt & +22 & +3 & 2 & 0 & 0 & 27 \\ \hline
+cpu\_bound.mp & +23 & +3 & 2 & 3 & 0 & 31 \\ \hline
+cpu\_bound.omp & +16 & +2 & 4 & 7 & 4 & 44 \\ \hline
+\it io\_bound.serial & 55 & 8 & - & - & - & - \\ \hline
+io\_bound.mt & +36 & +6 & 5 & 8 & 0 & 63 \\ \hline
+io\_bound.mp & +36 & +6 & 5 & 8 & 0 & 63 \\ \hline
+io\_bound.omp & +33 & +5 & 6 & 8 & 4 & 68 \\ \hline
+\it memory\_bound.serial & 30 & 3 & - & - & - & - \\ \hline
+memory\_bound.mt & +17 & +3 & 2 & 0 & 0 & 22 \\ \hline
+memory\_bound.mp & +17 & +3 & 2 & 11 & 0 & 44 \\ \hline
+memory\_bound.omp & +10 & +0 & 3 & 3 & 4 & 27 \\ \hline
+\it overhead.serial & 31 & 8 & - & - & - & - \\ \hline
+overhead.mt & +27 & +3 & 2 & 0 & 0 & 32 \\ \hline
+overhead.mp & +27 & +3 & 2 & 5 & 0 & 42 \\ \hline
+overhead.omp & +44 & +1 & 3 & 17 & 5 & 92 \\ \hline
 \end{tabular}
-\caption{Parallelism analysis over user/sys timing}
+\caption{Incremental development effort}
 \end{table*}
 profiling
 \section{Conclusion}
@@ -393,7 +410,12 @@ profiling
   \bibitem{gil} Thread State and the Global Interpreter Lock. \url{http://docs.python.org/2/c-api/init.html#threads}
 
   \bibitem{mv} Typed Memoryviews - Cython 0.19.2 documentation. \url{http://docs.cython.org/src/userguide/memoryviews.html}
-  
+   
+  \bibitem{sp} Sharing state between processes - Python v2.7.6 documentation documentation. \url{http://docs.python.org/2/library/multiprocessing.html#sharing-state-between-processes}
+
+  \bibitem{mccabe} mccabe 0.2.1 : Python Package Index. \url{https://pypi.python.org/pypi/mccabe}
+
+  \bibitem{mccabe} Debugging your Cython program - Cython 0.19.2 documentation. \url{http://docs.cython.org/src/userguide/debugging.html}
 
 \end{thebibliography}
 
